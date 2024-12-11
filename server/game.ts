@@ -1,15 +1,16 @@
 import type { WebSocket } from "ws";
-import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { rooms, players, rounds } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { generateImage } from "./services/imageGeneration";
+import { type NeonDatabase } from 'drizzle-orm/neon-serverless';
+import * as schema from "../db/schema";
 
 const WORDS = [
   "elephant", "basketball", "sunshine", "guitar", "rainbow",
   "butterfly", "spaceship", "waterfall", "dragon", "pizza"
 ];
 
-type DrizzleClient = NeonDatabase;
+type DrizzleClient = NeonDatabase<typeof schema>;
 
 export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleClient) {
   let gameState: any = null;

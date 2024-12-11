@@ -6,13 +6,19 @@ import GameBoard from "@/components/game/GameBoard";
 import { useWebSocket } from "@/lib/websocket";
 
 export default function Room() {
-  const [match] = useRoute("/room/:code");
+  const [match] = useRoute<{ code: string }>("/room/:code");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const code = match?.params.code;
 
   const { data: room, error } = useQuery({
-    queryKey: [`/api/rooms/${code}`],
+    queryKey: ["/api/rooms", code],
+    queryFn: async () => {
+      if (!code) throw new Error("Room code is required");
+      const response = await fetch(`/api/rooms/${code}`);
+      if (!response.ok) throw new Error("Failed to fetch room");
+      return response.json();
+    },
     enabled: !!code
   });
 
