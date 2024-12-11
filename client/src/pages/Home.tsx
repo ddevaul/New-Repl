@@ -13,21 +13,27 @@ export default function Home() {
 
   const createRoom = useMutation({
     mutationFn: async () => {
+      if (!playerName.trim()) {
+        throw new Error("Please enter your name");
+      }
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerName })
+        body: JSON.stringify({ playerName: playerName.trim() })
       });
-      if (!res.ok) throw new Error("Failed to create room");
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to create room");
+      }
       return res.json();
     },
     onSuccess: (data) => {
       setLocation(`/room/${data.code}`);
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to create room",
+        description: error.message || "Failed to create room",
         variant: "destructive"
       });
     }
@@ -35,21 +41,27 @@ export default function Home() {
 
   const joinRoom = useMutation({
     mutationFn: async (code: string) => {
+      if (!playerName.trim()) {
+        throw new Error("Please enter your name");
+      }
       const res = await fetch(`/api/rooms/${code}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerName })
+        body: JSON.stringify({ playerName: playerName.trim() })
       });
-      if (!res.ok) throw new Error("Failed to join room");
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to join room");
+      }
       return res.json();
     },
     onSuccess: (_, code) => {
       setLocation(`/room/${code}`);
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to join room",
+        description: error.message || "Failed to join room",
         variant: "destructive"
       });
     }
