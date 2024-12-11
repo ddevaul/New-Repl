@@ -43,7 +43,10 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
 
   if (!gameState) return null;
 
-  const isDrawer = gameState.currentPlayer?.isDrawer;
+  const currentPlayer = room.players.find(player => 
+    gameState.players.find((p: any) => p.id === player.id)?.isDrawer === player.isDrawer
+  );
+  const isDrawer = currentPlayer?.isDrawer ?? false;
 
   return (
     <Card className="p-6">

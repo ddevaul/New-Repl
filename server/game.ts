@@ -35,7 +35,9 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
       players: room.players,
       word: room.rounds[0]?.word,
       attemptsLeft: 3 - (room.rounds[0]?.drawerPrompts?.length || 0),
-      currentImage: null // In a real implementation, this would be the AI-generated image URL
+      currentImage: room.rounds[0]?.drawerPrompts?.length 
+        ? await generateImage(room.rounds[0].drawerPrompts[room.rounds[0].drawerPrompts.length - 1])
+        : null
     };
 
     ws.send(JSON.stringify(gameState));
