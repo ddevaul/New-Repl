@@ -4,8 +4,19 @@ import Prompt from "./Prompt";
 import Guess from "./Guess";
 
 interface GameBoardProps {
-  socket: WebSocket;
-  room: any;
+  socket: WebSocket | null;
+  room: {
+    id: number;
+    code: string;
+    status: string;
+    currentRound: number;
+    players: Array<{
+      id: number;
+      name: string;
+      isDrawer: boolean;
+      score: number;
+    }>;
+  };
 }
 
 export default function GameBoard({ socket, room }: GameBoardProps) {
@@ -14,10 +25,20 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
   useEffect(() => {
     if (!socket) return;
 
-    socket.addEventListener("message", (event) => {
-      const data = JSON.parse(event.data);
-      setGameState(data);
-    });
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        setGameState(data);
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
+
+    socket.addEventListener("message", handleMessage);
+    
+    return () => {
+      socket.removeEventListener("message", handleMessage);
+    };
   }, [socket]);
 
   if (!gameState) return null;
