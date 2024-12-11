@@ -1,14 +1,15 @@
 import type { WebSocket } from "ws";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { rooms, players, rounds } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { generateImage } from "./services/imageGeneration";
 
 const WORDS = [
   "elephant", "basketball", "sunshine", "guitar", "rainbow",
   "butterfly", "spaceship", "waterfall", "dragon", "pizza"
 ];
 
-type DrizzleClient = PostgresJsDatabase;
+type DrizzleClient = NeonDatabase;
 
 export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleClient) {
   let gameState: any = null;
@@ -48,8 +49,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
     if (!round) return;
 
-    // In a real implementation, this would call the AI image generation API
-    const imageUrl = `https://placeholder.com/ai-image/${prompt}`;
+    // Generate image using Stability AI
+    const imageUrl = await generateImage(prompt);
 
     await db.update(rounds)
       .set({
