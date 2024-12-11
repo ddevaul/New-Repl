@@ -43,9 +43,9 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
 
   if (!gameState) return null;
 
-  const currentPlayer = room.players.find(player => 
+  const currentPlayer = gameState?.players ? room.players.find(player => 
     gameState.players.find((p: any) => p.id === player.id)?.isDrawer === player.isDrawer
-  );
+  ) : null;
   const isDrawer = currentPlayer?.isDrawer ?? false;
 
   return (
@@ -53,7 +53,7 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
       <div className="space-y-6">
         <div className="text-center">
           <h2 className="text-xl font-semibold">
-            Round {gameState.currentRound}
+            Round {gameState?.currentRound ?? 1}
           </h2>
           <p className="text-muted-foreground">
             {isDrawer ? "You are the drawer" : "You are guessing"}
