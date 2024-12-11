@@ -28,6 +28,14 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
     const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
+        
+        // Handle error messages
+        if (data.error) {
+          console.error('Game error:', data.error, data.details);
+          return;
+        }
+
+        // Update game state
         setGameState(data);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
@@ -41,7 +49,15 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
     };
   }, [socket]);
 
-  if (!gameState) return null;
+  if (!gameState) {
+    return (
+      <Card className="p-6">
+        <div className="text-center text-muted-foreground">
+          Loading game...
+        </div>
+      </Card>
+    );
+  }
 
   const currentPlayer = gameState?.players ? room.players.find(player => 
     gameState.players.find((p: any) => p.id === player.id)?.isDrawer === player.isDrawer

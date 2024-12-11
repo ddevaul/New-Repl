@@ -65,30 +65,53 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
   const handlePrompt = async (prompt: string) => {
     try {
-      if (!gameState || gameState.attemptsLeft === 0) return;
+      if (!gameState || gameState.attemptsLeft === 0) {
+        ws.send(JSON.stringify({ error: 'Invalid game state or no attempts left' }));
+        return;
+      }
 
       const round = await db.query.rounds.findFirst({
         where: eq(rounds.roomId, gameState.roomId)
       });
 
-      if (!round) return;
+      if (!round) {
+        ws.send(JSON.stringify({ error: 'Round not found' }));
+        return;
+      }
 
       // Generate image using Stability AI
       const imageUrl = await generateImage(prompt);
+      console.log('Generated image URL:', imageUrl?.substring(0, 50) + '...');
 
+      // Update the round with the new prompt
       await db.update(rounds)
         .set({
           drawerPrompts: [...(round.drawerPrompts || []), prompt]
         })
         .where(eq(rounds.id, round.id));
 
-      gameState.currentImage = imageUrl;
-      gameState.attemptsLeft--;
+      // Update game state
+      gameState = {
+        ...gameState,
+        currentImage: imageUrl,
+        attemptsLeft: gameState.attemptsLeft - 1
+      };
 
+      // Send updated game state to client
       ws.send(JSON.stringify(gameState));
+      
+      // Log success
+      console.log('Successfully handled prompt:', {
+        roomId: gameState.roomId,
+        attemptsLeft: gameState.attemptsLeft,
+        hasImage: !!gameState.currentImage
+      });
     } catch (error) {
       console.error('Failed to handle prompt:', error);
-      ws.send(JSON.stringify({ error: 'Failed to handle prompt' }));
+      ws.send(JSON.stringify({ 
+        error: 'Failed to handle prompt',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }));
     }
   };
 
