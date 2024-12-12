@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
+import WordManager from "@/components/game/WordManager";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -77,47 +78,52 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-            AI Pictionary
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Input
-            placeholder="Enter your name"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-          />
-          <div className="grid gap-4">
-            <Button
-              disabled={!playerName}
-              onClick={() => createRoom.mutate()}
-              className="w-full"
-            >
-              Create Room
-            </Button>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or join existing
-                </span>
-              </div>
-            </div>
+      <div className="w-full max-w-4xl space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              AI Pictionary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <Input
-              placeholder="Enter room code"
-              onChange={(e) => {
-                if (playerName && e.target.value.length === 6) {
-                  joinRoom.mutate(e.target.value);
-                }
-              }}
+              placeholder="Enter your name"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
             />
-          </div>
-        </CardContent>
-      </Card>
+            <div className="grid gap-4">
+              <Button
+                disabled={!playerName}
+                onClick={() => createRoom.mutate()}
+                className="w-full"
+              >
+                Create Room
+              </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or join existing
+                  </span>
+                </div>
+              </div>
+              <Input
+                placeholder="Enter room code"
+                onChange={(e) => {
+                  if (playerName && e.target.value.length === 6) {
+                    joinRoom.mutate(e.target.value);
+                  }
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Word Category Manager */}
+        <WordManager />
+      </div>
     </div>
   );
 }
