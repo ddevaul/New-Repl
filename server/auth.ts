@@ -40,7 +40,16 @@ export async function signup(req: Request, res: Response) {
     // Generate JWT
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '24h' });
 
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name, gamesPlayed: user.gamesPlayed } });
+    res.json({ 
+      token, 
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        name: user.name, 
+        gamesPlayed: user.gamesPlayed,
+        isAdmin: user.isAdmin 
+      } 
+    });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).send("Error creating user");
@@ -69,7 +78,16 @@ export async function login(req: Request, res: Response) {
     // Generate JWT
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '24h' });
 
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name, gamesPlayed: user.gamesPlayed } });
+    res.json({ 
+      token, 
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        name: user.name, 
+        gamesPlayed: user.gamesPlayed,
+        isAdmin: user.isAdmin 
+      } 
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).send("Error logging in");

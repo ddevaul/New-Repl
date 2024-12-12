@@ -64,9 +64,14 @@ export default function AuthForm() {
         description: isLogin ? "Successfully logged in!" : "Account created successfully!",
       });
 
-      // Store the token and redirect
+      // Store the token and user info
       localStorage.setItem('authToken', result.token);
-      setLocation("/");
+      // If user is admin, redirect to admin dashboard, otherwise to home
+      if (result.user.isAdmin) {
+        setLocation("/admin");
+      } else {
+        setLocation("/");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
