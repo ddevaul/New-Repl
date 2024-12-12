@@ -1,8 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
-import { rooms, type Room } from "./game";
-import { setupGameHandlers } from "./game";
+import { rooms, type Room, setupGameHandlers, WORDS } from "./game";
 
 let nextRoomId = 1;
 let nextPlayerId = 1;
@@ -30,11 +29,15 @@ export function registerRoutes(app: Express): Server {
         isDrawer: true,
         score: 0
       }],
+      word: WORDS[Math.floor(Math.random() * WORDS.length)],
       drawerPrompts: [],
-      guesses: []
+      guesses: [],
+      currentImage: null,
+      attemptsLeft: 3
     };
     
     rooms.set(code, room);
+    console.log(`Created room ${code} with word "${room.word}"`);
     res.json({ code: room.code });
   });
 
