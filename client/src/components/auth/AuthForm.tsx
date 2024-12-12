@@ -45,7 +45,7 @@ export default function AuthForm() {
     },
   });
 
-  const handleSubmit = async (data: AuthFormValues) => {
+  async function onSubmit(values: AuthFormValues) {
     try {
       setLoading(true);
       console.log("Form submission started");
@@ -56,9 +56,9 @@ export default function AuthForm() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(isLogin ? {
-          email: data.email,
-          password: data.password
-        } : data),
+          email: values.email,
+          password: values.password
+        } : values),
       });
 
       console.log("Response received:", response.status);
@@ -95,7 +95,7 @@ export default function AuthForm() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <Card className="w-full max-w-md">
@@ -106,7 +106,7 @@ export default function AuthForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {!isLogin && (
               <FormField
                 control={form.control}
@@ -152,10 +152,6 @@ export default function AuthForm() {
               type="submit" 
               className="w-full" 
               disabled={loading}
-              onClick={(e) => {
-                e.preventDefault();
-                form.handleSubmit(handleSubmit)();
-              }}
             >
               {loading ? "Please wait..." : (isLogin ? "Log In" : "Sign Up")}
             </Button>
