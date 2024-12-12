@@ -1,6 +1,7 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
+import { signup, login, authMiddleware, checkGameLimit } from "./auth.js";
 import { 
   rooms, 
   type Room, 
@@ -15,6 +16,10 @@ let nextRoomId = 1;
 let nextPlayerId = 1;
 
 export function registerRoutes(app: Express): Server {
+  // Auth routes
+  app.post("/api/auth/signup", signup);
+  app.post("/api/auth/login", login);
+
   // Get leaderboard
   app.get("/api/leaderboard", async (req, res) => {
     try {
@@ -31,8 +36,8 @@ export function registerRoutes(app: Express): Server {
 
   
 
-  // Create room
-  app.post("/api/rooms", (req, res) => {
+  // Create room (protected route)
+  app.post("/api/rooms", authMiddleware, checkGameLimit, async (req, res) => {
     const { playerName } = req.body;
     if (!playerName) {
       return res.status(400).json({ message: "Player name is required" });
@@ -54,7 +59,9 @@ export function registerRoutes(app: Express): Server {
       drawerPrompts: [],
       guesses: [],
       currentImage: null,
-      attemptsLeft: 3
+      attemptsLeft: 3,
+      waitingForGuess: false,
+      waitingForPrompt: false
     };
     
     rooms.set(code, room);

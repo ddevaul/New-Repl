@@ -2,12 +2,22 @@ import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").unique().notNull(),
+  password: text("password").notNull(),
+  name: text("name").notNull(),
+  gamesPlayed: integer("games_played").default(0),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
 export const rooms = pgTable("rooms", {
   id: serial("id").primaryKey(),
   code: text("code").unique().notNull(),
   status: text("status").notNull().default("waiting"), // waiting, playing, ended
   currentRound: integer("current_round").default(1),
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  creatorId: integer("creator_id").references(() => users.id)
 });
 
 export const players = pgTable("players", {
@@ -39,9 +49,17 @@ export const highScores = pgTable("high_scores", {
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
-export const roomRelations = relations(rooms, ({ many }) => ({
+export const userRelations = relations(users, ({ many }) => ({
+  rooms: many(rooms)
+}));
+
+export const roomRelations = relations(rooms, ({ many, one }) => ({
   players: many(players),
-  rounds: many(rounds)
+  rounds: many(rounds),
+  creator: one(users, {
+    fields: [rooms.creatorId],
+    references: [users.id]
+  })
 }));
 
 export const playerRelations = relations(players, ({ one }) => ({
@@ -50,6 +68,9 @@ export const playerRelations = relations(players, ({ one }) => ({
     references: [rooms.id]
   })
 }));
+
+export const insertUserSchema = createInsertSchema(users);
+export const selectUserSchema = createSelectSchema(users);
 
 export const roundRelations = relations(rounds, ({ one }) => ({
   room: one(rooms, {
