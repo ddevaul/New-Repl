@@ -5,21 +5,42 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-
+import { useEffect } from "react";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [playerName, setPlayerName] = useState("");
   const { toast } = useToast();
 
+  // Check for authentication on component mount
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setLocation('/auth');
+      toast({
+        title: "Authentication Required",
+        description: "Please login or sign up to continue",
+        variant: "destructive"
+      });
+    }
+  }, []);
+
   const createRoom = useMutation({
     mutationFn: async () => {
       if (!playerName.trim()) {
         throw new Error("Please enter your name");
       }
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+      
       const res = await fetch("/api/rooms", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ playerName: playerName.trim() })
       });
       if (!res.ok) {
