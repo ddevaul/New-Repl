@@ -8,7 +8,7 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "cloudrun"
 build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+run = ["sh", "-c", "npm run dev"]
 
 [[ports]]
 localPort = 5000
@@ -24,10 +24,10 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start application"
+args = "AI Pictionary"
 
 [[workflows.workflow]]
-name = "Start application"
+name = "AI Pictionary"
 author = "agent"
 
 [workflows.workflow.metadata]
