@@ -92,7 +92,7 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
   }
 
   const currentPlayer = room.players.find(player => 
-    gameState?.players?.some((p: any) => p.id === player.id && p.isDrawer === player.isDrawer)
+    room.players?.some(p => p.id === player.id)
   );
   const isDrawer = currentPlayer?.isDrawer ?? false;
 
@@ -152,7 +152,7 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
             </div>
 
             <GuessHistory 
-              guesses={gameState.guesses || []}
+              guesses={gameState.guessData || []}
               currentPlayerId={room.players.find(p => !p.isDrawer)?.id}
             />
           </div>

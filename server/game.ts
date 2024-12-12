@@ -23,10 +23,26 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
           players: true,
           rounds: {
             where: eq(rounds.isCompleted, false),
-            limit: 1
+            limit: 1,
+            orderBy: [{ id: "desc" }]
           }
         }
       });
+
+      if (!room) {
+        console.error(`Room not found: ${roomCode}`);
+        ws.close();
+        return;
+      }
+
+      // Broadcast player join event
+      if (!gameState) {
+        ws.send(JSON.stringify({
+          type: 'playerUpdate',
+          joined: true,
+          playerName: room.players[room.players.length - 1]?.name
+        }));
+      }
 
       if (!room) {
         console.error(`Room not found: ${roomCode}`);
@@ -53,7 +69,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         attemptsLeft: 3 - (room.rounds[0]?.drawerPrompts?.length || 0),
         currentImage: room.rounds[0]?.drawerPrompts?.length 
           ? await generateImage(room.rounds[0].drawerPrompts[room.rounds[0].drawerPrompts.length - 1])
-          : null
+          : null,
+        guessData: room.rounds[0]?.guessData ? JSON.parse(room.rounds[0].guessData) : []
       };
 
       ws.send(JSON.stringify(gameState));
@@ -144,7 +161,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
       await db.update(rounds)
         .set({
-          guesses: [...(round.guesses || []), formattedGuess],
+          guesses: [...(round.guesses || []), guess],
+          guessData: JSON.stringify([...(JSON.parse(round.guessData || '[]')), formattedGuess]),
           isCompleted: formattedGuess.isCorrect
         })
         .where(eq(rounds.id, round.id));

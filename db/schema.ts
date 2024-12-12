@@ -23,7 +23,8 @@ export const rounds = pgTable("rounds", {
   roomId: integer("room_id").references(() => rooms.id),
   word: text("word").notNull(),
   drawerPrompts: text("drawer_prompts").array(),
-  guesses: text("guesses", { mode: "json" }).$type<Array<{
+  guesses: text("guesses").array().default([]).$type<string[]>(),
+  guessData: text("guess_data").default('[]').$type<Array<{
     playerId: number;
     playerName: string;
     guess: string;
