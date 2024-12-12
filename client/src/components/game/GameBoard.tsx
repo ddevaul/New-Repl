@@ -55,9 +55,9 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
         }
 
         // Handle round completion
-        if (data.type === 'roundComplete') {
+        if (data.type === 'roundComplete' || data.type === 'gameComplete') {
           toast({
-            title: "Round Complete!",
+            title: data.type === 'gameComplete' ? "Game Over!" : "Round Complete!",
             description: data.message,
             variant: "default"
           });
@@ -110,10 +110,22 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
       <div className="space-y-8">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-            Round {gameState?.currentRound ?? 1}
+            Round {gameState?.currentRound ?? 1} of 6
           </h2>
-          <p className="text-lg text-muted-foreground">
-            {isDrawer ? "You are the drawer" : "You are guessing"}
+          <div className="w-full max-w-md mx-auto">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300" 
+                style={{ width: `${((gameState?.currentRound ?? 1) / 6) * 100}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-lg text-muted-foreground mt-4">
+            {room.status === 'ended' ? (
+              <span className="font-bold text-primary">Game Complete!</span>
+            ) : (
+              isDrawer ? "You are the drawer" : "You are guessing"
+            )}
           </p>
         </div>
 

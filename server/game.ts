@@ -127,18 +127,33 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             }));
             
             // Start new round without points
-            room.players = room.players.map(player => ({
-              ...player,
-              isDrawer: !player.isDrawer // Swap roles
-            }));
+            if (room.currentRound >= 6) { // Game ends after 6 rounds (3 rounds per player as drawer)
+              // End game
+              room.status = 'ended';
+              
+              // Notify all clients about game end
+              connections.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                  client.send(JSON.stringify({
+                    type: 'gameComplete',
+                    message: `Game Over! Final scores: ${room.players.map(p => `${p.name}: ${p.score}`).join(', ')}`
+                  }));
+                }
+              });
+            } else {
+              room.players = room.players.map(player => ({
+                ...player,
+                isDrawer: !player.isDrawer // Swap roles
+              }));
 
-            // Reset for next round
-            room.currentRound += 1;
-            room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
-            room.drawerPrompts = [];
-            room.guesses = [];
-            room.currentImage = null;
-            room.attemptsLeft = 3;
+              // Reset for next round
+              room.currentRound += 1;
+              room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+              room.drawerPrompts = [];
+              room.guesses = [];
+              room.currentImage = null;
+              room.attemptsLeft = 3;
+            }
 
             // Notify all clients about round end
             connections.forEach(client => {
@@ -212,20 +227,40 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           if (message.guess.toLowerCase() === room.word?.toLowerCase()) {
             console.log('Correct guess! Starting new round');
             
-            // Update scores and swap roles
+            // Update scores
             room.players = room.players.map(player => ({
               ...player,
               score: player.score + (player.isDrawer ? 5 : 10), // Drawer gets 5 points, guesser gets 10
-              isDrawer: !player.isDrawer // Swap roles
             }));
 
-            // Reset for next round
-            room.currentRound += 1;
-            room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
-            room.drawerPrompts = [];
-            room.guesses = [];
-            room.currentImage = null;
-            room.attemptsLeft = 3;
+            if (room.currentRound >= 6) { // Game ends after 6 rounds (3 rounds per player as drawer)
+              // End game
+              room.status = 'ended';
+              
+              // Notify all clients about game end
+              connections.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                  client.send(JSON.stringify({
+                    type: 'gameComplete',
+                    message: `Game Over! Final scores: ${room.players.map(p => `${p.name}: ${p.score}`).join(', ')}`
+                  }));
+                }
+              });
+            } else {
+              // Swap roles and continue to next round
+              room.players = room.players.map(player => ({
+                ...player,
+                isDrawer: !player.isDrawer // Swap roles
+              }));
+
+              // Reset for next round
+              room.currentRound += 1;
+              room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+              room.drawerPrompts = [];
+              room.guesses = [];
+              room.currentImage = null;
+              room.attemptsLeft = 3;
+            }
 
             // Notify all clients
             connections.forEach(client => {
