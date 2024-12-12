@@ -1,5 +1,5 @@
 import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
-import { type WebSocket } from "ws";
+import { WebSocket } from "ws";
 // Game state is managed in memory
 
 // Organized word lists by category
@@ -61,8 +61,7 @@ export type Room = {
 };
 
 // Keep track of WebSocket connections for each room
-import { WebSocket as WSWebSocket } from "ws";
-const roomConnections = new Map<string, Map<number, WSWebSocket>>();
+const roomConnections = new Map<string, Map<number, WebSocket>>();
 
 // Store active game rooms
 export const rooms = new Map<string, Room>();
@@ -109,7 +108,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
     if (!room) return;
     
     connections.forEach((client, pid) => {
-      if (client.readyState === WebSocket.OPEN) {
+      if (client.readyState === 1) { // WebSocket.OPEN
         const currentPlayer = room.players.find(p => p.id === pid);
         if (!currentPlayer) return;
 
@@ -164,7 +163,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               
               // Notify all clients about game end
               connections.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
+                if (client.readyState === 1) { // WebSocket.OPEN
                   client.send(JSON.stringify({
                     type: 'gameComplete',
                     message: `Game Over! Final scores: ${room.players.map(p => `${p.name}: ${p.score}`).join(', ')}`
@@ -179,7 +178,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
               // Reset for next round
               room.currentRound += 1;
-              room.word = getRandomWord(); // Use new getRandomWord function
+              room.word = getRandomWord();
               room.drawerPrompts = [];
               room.guesses = [];
               room.currentImage = null;
@@ -188,7 +187,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
             // Notify all clients about round end
             connections.forEach(client => {
-              if (client.readyState === WebSocket.OPEN) {
+              if (client.readyState === 1) { // WebSocket.OPEN
                 client.send(JSON.stringify({
                   type: 'roundComplete',
                   message: `Out of attempts! The word was "${room.word}". No points awarded. Swapping roles...`
@@ -270,7 +269,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               
               // Notify all clients about game end
               connections.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
+                if (client.readyState === 1) { // WebSocket.OPEN
                   client.send(JSON.stringify({
                     type: 'gameComplete',
                     message: `Game Over! Final scores: ${room.players.map(p => `${p.name}: ${p.score}`).join(', ')}`
@@ -286,7 +285,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
               // Reset for next round
               room.currentRound += 1;
-              room.word = getRandomWord(); // Use new getRandomWord function
+              room.word = getRandomWord();
               room.drawerPrompts = [];
               room.guesses = [];
               room.currentImage = null;
@@ -295,7 +294,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
             // Notify all clients
             connections.forEach(client => {
-              if (client.readyState === WebSocket.OPEN) {
+              if (client.readyState === 1) { // WebSocket.OPEN
                 client.send(JSON.stringify({
                   type: 'roundComplete',
                   message: `Correct! The word was "${message.guess}". Swapping roles...`
@@ -315,7 +314,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
   // Initialize game state and send it to the client
   if (!room.word) {
-    room.word = getRandomWord(); // Use new getRandomWord function
+    room.word = getRandomWord();
   }
 
   // Send initial game state
