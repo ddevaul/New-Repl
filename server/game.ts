@@ -90,14 +90,21 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         })
         .where(eq(rounds.id, round.id));
 
-      // Update game state
+      // First send a loading state
+      ws.send(JSON.stringify({
+        ...gameState,
+        currentImage: null,
+        attemptsLeft: gameState.attemptsLeft - 1
+      }));
+
+      // Then send the actual image once generated
       gameState = {
         ...gameState,
         currentImage: imageUrl,
         attemptsLeft: gameState.attemptsLeft - 1
       };
 
-      // Send updated game state to client
+      // Send final state with image to client
       ws.send(JSON.stringify(gameState));
       
       // Log success

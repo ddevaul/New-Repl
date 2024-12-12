@@ -86,15 +86,21 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           </p>
         </div>
 
-        {gameState.currentImage && (
-          <div className="flex justify-center">
+        <div className="flex justify-center">
+          {gameState.currentImage ? (
             <img
               src={gameState.currentImage}
               alt="AI Generated"
-              className="max-w-full h-auto rounded-lg"
+              className="w-[512px] h-[512px] rounded-lg object-cover"
             />
-          </div>
-        )}
+          ) : (
+            <div className="w-[512px] h-[512px] rounded-lg bg-muted flex items-center justify-center">
+              <p className="text-muted-foreground">
+                Generating image...
+              </p>
+            </div>
+          )}
+        </div>
 
         {isDrawer ? (
           <Prompt
