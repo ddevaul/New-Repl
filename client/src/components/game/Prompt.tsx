@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface PromptProps {
   socket: WebSocket;
-  word: string;
+  word?: string;
   attemptsLeft: number;
 }
 
@@ -36,7 +36,7 @@ export default function Prompt({ socket, word, attemptsLeft }: PromptProps) {
       <div className="p-6 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg space-y-2">
         <p className="font-medium text-muted-foreground">Your word is:</p>
         <p className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-          {word}
+          {word || 'Loading...'}
         </p>
         <div className="mt-4 flex items-center gap-2">
           <div className="h-2 flex-1 bg-muted-foreground/20 rounded-full overflow-hidden">

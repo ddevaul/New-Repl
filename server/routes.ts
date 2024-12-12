@@ -4,6 +4,9 @@ import { WebSocketServer } from "ws";
 import { rooms, type Room } from "./game";
 import { setupGameHandlers } from "./game";
 
+let nextRoomId = 1;
+let nextPlayerId = 1;
+
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
@@ -82,7 +85,7 @@ export function registerRoutes(app: Express): Server {
     const roomCode = match[1];
 
     wss.handleUpgrade(request, socket, head, (ws) => {
-      setupGameHandlers(ws, roomCode, db);
+      setupGameHandlers(ws, roomCode);
     });
   });
 

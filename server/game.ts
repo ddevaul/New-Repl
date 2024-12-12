@@ -5,6 +5,7 @@ const WORDS = [
   "elephant", "basketball", "sunshine", "guitar", "rainbow",
   "butterfly", "spaceship", "waterfall", "dragon", "pizza"
 ];
+
 type Player = {
   id: number;
   name: string;
@@ -21,18 +22,13 @@ type Room = {
   word?: string;
   drawerPrompts: string[];
   guesses: Array<{ text: string; player: string; timestamp: string }>;
+  currentImage?: string | null;
+  attemptsLeft?: number;
 };
 
 const rooms = new Map<string, Room>();
 let nextRoomId = 1;
 let nextPlayerId = 1;
-
-const WORDS = [
-  "elephant", "basketball", "sunshine", "guitar", "rainbow",
-  "butterfly", "spaceship", "waterfall", "dragon", "pizza"
-];
-
-type DrizzleClient = NeonDatabase<typeof schema>;
 
 export function setupGameHandlers(ws: WebSocket, roomCode: string) {
   let gameState: Room | null = null;
@@ -68,122 +64,78 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string) {
 
   const handlePrompt = async (prompt: string) => {
     try {
-      if (!gameState || gameState.attemptsLeft === 0) {
-        ws.send(JSON.stringify({ error: 'Invalid game state or no attempts left' }));
-        return;
-      }
+      if (!gameState) return;
 
-      const round = await db.query.rounds.findFirst({
-        where: eq(rounds.roomId, gameState.roomId)
-      });
-
-      if (!round) {
-        ws.send(JSON.stringify({ error: 'Round not found' }));
-        return;
-      }
-
-      // Generate image using Stability AI
-      const imageUrl = await generateImage(prompt);
-      console.log('Generated image URL:', imageUrl?.substring(0, 50) + '...');
-
-      // Update the round with the new prompt
-      await db.update(rounds)
-        .set({
-          drawerPrompts: [...(round.drawerPrompts || []), prompt]
-        })
-        .where(eq(rounds.id, round.id));
+      const room = rooms.get(roomCode);
+      if (!room) return;
 
       // First send a loading state
       ws.send(JSON.stringify({
         ...gameState,
-        currentImage: null,
-        attemptsLeft: gameState.attemptsLeft - 1,
-        error: null
+        currentImage: null
       }));
 
-      // Then send the actual image once generated
+      // Generate image using Stability AI
+      const imageUrl = await generateImage(prompt);
+      room.drawerPrompts.push(prompt);
+      room.currentImage = imageUrl;
+
+      // Update state with generated image
       gameState = {
-        ...gameState,
+        ...room,
         currentImage: imageUrl,
-        attemptsLeft: gameState.attemptsLeft - 1,
-        error: imageUrl === PLACEHOLDER_IMAGE ? "Image generation failed. Please try again once API key is configured." : null
+        attemptsLeft: Math.max(0, (gameState.attemptsLeft || 3) - 1)
       };
 
-      // Send final state with image to client
+      // Send final state with image
       ws.send(JSON.stringify(gameState));
-      
-      // Log success
-      console.log('Successfully handled prompt:', {
-        roomId: gameState.roomId,
-        attemptsLeft: gameState.attemptsLeft,
-        hasImage: !!gameState.currentImage
-      });
+
     } catch (error) {
       console.error('Failed to handle prompt:', error);
-      ws.send(JSON.stringify({ 
-        error: 'Failed to handle prompt',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }));
+      ws.send(JSON.stringify({ error: 'Failed to handle prompt' }));
     }
   };
 
   const handleGuess = async (guess: string) => {
     try {
-      if (!gameState || gameState.attemptsLeft === 0) return;
+      if (!gameState) return;
 
-      const round = await db.query.rounds.findFirst({
-        where: eq(rounds.roomId, gameState.roomId)
+      const room = rooms.get(roomCode);
+      if (!room) return;
+
+      const guessingPlayer = room.players.find(p => !p.isDrawer);
+      if (!guessingPlayer) return;
+
+      // Add the guess to the room's guesses
+      room.guesses.push({
+        text: guess,
+        player: guessingPlayer.name,
+        timestamp: new Date().toISOString()
       });
 
-      if (!round) return;
+      // Check if the guess is correct
+      if (guess.toLowerCase() === room.word?.toLowerCase()) {
+        // Update scores
+        const pointsEarned = { guesser: 10, drawer: 5 };
+        
+        room.players = room.players.map(player => ({
+          ...player,
+          score: player.score + (player.isDrawer ? pointsEarned.drawer : pointsEarned.guesser),
+          isDrawer: !player.isDrawer // Swap roles
+        }));
 
-      await db.update(rounds)
-        .set({
-          guesses: [...(round.guesses || []), guess],
-          isCompleted: guess.toLowerCase() === round.word.toLowerCase()
-        })
-        .where(eq(rounds.id, round.id));
+        // Reset for new round
+        room.currentRound += 1;
+        room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+        room.drawerPrompts = [];
+        room.guesses = [];
+        room.currentImage = null;
 
-      if (guess.toLowerCase() === round.word.toLowerCase()) {
-        // Update score for the guesser
-        const guessingPlayer = gameState.players.find((p: any) => !p.isDrawer);
-        if (guessingPlayer) {
-          const pointsEarned = 10;
-          await db.update(players)
-            .set({ 
-              score: guessingPlayer.score + pointsEarned,
-              isDrawer: !guessingPlayer.isDrawer // Swap roles
-            })
-            .where(eq(players.id, guessingPlayer.id));
-
-          // Also give points to the drawer
-          const drawingPlayer = gameState.players.find((p: any) => p.isDrawer);
-          if (drawingPlayer) {
-            await db.update(players)
-              .set({ 
-                score: drawingPlayer.score + 5,
-                isDrawer: !drawingPlayer.isDrawer // Swap roles
-              })
-              .where(eq(players.id, drawingPlayer.id));
-          }
-        }
-
-        // Start new round
-        const newWord = WORDS[Math.floor(Math.random() * WORDS.length)];
-        await db.insert(rounds).values({
-          roomId: gameState.roomId,
-          word: newWord
-        });
-
-        await db.update(rooms)
-          .set({ currentRound: gameState.currentRound + 1 })
-          .where(eq(rooms.id, gameState.roomId));
-
-        // Send a success message to the client
+        // Send success message
         ws.send(JSON.stringify({
           type: 'roundComplete',
           message: 'Correct guess! Starting new round...',
-          pointsEarned: { guesser: 10, drawer: 5 }
+          pointsEarned
         }));
       }
 
@@ -212,7 +164,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string) {
   });
 
   ws.on("close", () => {
-    // Cleanup
+    // Handle cleanup if needed
   });
 
   // Initialize game state
@@ -220,3 +172,5 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string) {
     console.error('Failed to initialize game state:', error);
   });
 }
+
+export { rooms, type Room };

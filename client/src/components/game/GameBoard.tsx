@@ -21,7 +21,20 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ socket, room }: GameBoardProps) {
-  const [gameState, setGameState] = useState<any>(null);
+  const [gameState, setGameState] = useState<{
+    word?: string;
+    attemptsLeft: number;
+    currentImage: string | null;
+    guesses: Array<{ text: string; player: string; timestamp: string }>;
+    error?: string;
+    players: Array<{
+      id: number;
+      name: string;
+      isDrawer: boolean;
+      score: number;
+    }>;
+    currentRound: number;
+  } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -146,13 +159,13 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
 
         {isDrawer ? (
           <Prompt
-            socket={socket}
+            socket={socket!}
             word={gameState.word}
             attemptsLeft={gameState.attemptsLeft}
           />
         ) : (
           <Guess
-            socket={socket}
+            socket={socket!}
             attemptsLeft={gameState.attemptsLeft}
           />
         )}
