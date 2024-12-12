@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
-import { rooms, type Room, setupGameHandlers, WORDS } from "./game";
+import { rooms, type Room, setupGameHandlers, WORDS } from "./game.js";
 
 let nextRoomId = 1;
 let nextPlayerId = 1;

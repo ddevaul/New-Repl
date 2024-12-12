@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
 
+// Pre-defined list of words for the game
 export const WORDS = [
   "elephant", "basketball", "sunshine", "guitar", "rainbow",
   "butterfly", "spaceship", "waterfall", "dragon", "pizza",
