@@ -10,8 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface User {
   id: number;
@@ -27,6 +26,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -112,7 +112,7 @@ export default function AdminDashboard() {
               <TableHead>Games Played</TableHead>
               <TableHead>Games Limit</TableHead>
               <TableHead>Is Admin</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead>Manage Game Limit</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,7 +123,6 @@ export default function AdminDashboard() {
                 <TableCell>{user.gamesPlayed}</TableCell>
                 <TableCell>{user.gamesLimit}</TableCell>
                 <TableCell>{user.isAdmin ? "Yes" : "No"}</TableCell>
-                <TableCell>{user.isAdmin ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Input
