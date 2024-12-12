@@ -92,12 +92,20 @@ export function registerRoutes(app: Express): Server {
     const url = request.url;
     if (!url) return socket.destroy();
 
-    const match = url.match(/^\/ws\/room\/([A-Z0-9]{6})$/);
-    if (!match) return socket.destroy();
+    const match = url.match(/^\/ws\/room\/([A-Z0-9]{6})\?playerId=(\d+)$/);
+    if (!match) {
+      console.log('Invalid WebSocket URL format:', url);
+      return socket.destroy();
+    }
 
-    const roomCode = match[1];
+    const [, roomCode, playerId] = match;
+    if (!rooms.has(roomCode)) {
+      console.log('Room not found:', roomCode);
+      return socket.destroy();
+    }
 
     wss.handleUpgrade(request, socket, head, (ws) => {
+      console.log(`WebSocket connection established for player ${playerId} in room ${roomCode}`);
       setupGameHandlers(ws, roomCode, url);
     });
   });
