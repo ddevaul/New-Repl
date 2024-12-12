@@ -2,11 +2,27 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { rooms, type Room, setupGameHandlers, WORDS } from "./game.js";
+import { db } from "../db/index.js";
+import { highScores } from "../db/schema.js";
+import { desc, sql } from "drizzle-orm";
 
 let nextRoomId = 1;
 let nextPlayerId = 1;
 
 export function registerRoutes(app: Express): Server {
+  // Get leaderboard
+  app.get("/api/leaderboard", async (req, res) => {
+    try {
+      const scores = await db.query.highScores.findMany({
+        orderBy: [desc(highScores.score)],
+        limit: 10
+      });
+      res.json(scores);
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      res.status(500).json({ message: "Failed to fetch leaderboard" });
+    }
+  });
   const httpServer = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 

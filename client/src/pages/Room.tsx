@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import GameBoard from "@/components/game/GameBoard";
+import Leaderboard from "@/components/game/Leaderboard";
 import { useWebSocket } from "@/lib/websocket";
 
 export default function Room() {
@@ -75,7 +76,7 @@ export default function Room() {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Room Code: {code}</h1>
@@ -104,7 +105,12 @@ export default function Room() {
             ))}
           </div>
         </div>
-        <GameBoard socket={socket} room={room} />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-6">
+          <GameBoard socket={socket} room={room} />
+          <div className="space-y-6">
+            <Leaderboard />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -28,6 +28,17 @@ export const rounds = pgTable("rounds", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+export const highScores = pgTable("high_scores", {
+  id: serial("id").primaryKey(),
+  playerName: text("player_name").notNull(),
+  score: integer("score").notNull(),
+  gamesPlayed: integer("games_played").notNull().default(1),
+  totalGuessesCorrect: integer("total_guesses_correct").notNull().default(0),
+  totalDrawingsGuessed: integer("total_drawings_guessed").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 export const roomRelations = relations(rooms, ({ many }) => ({
   players: many(players),
   rounds: many(rounds)
@@ -53,3 +64,5 @@ export const insertPlayerSchema = createInsertSchema(players);
 export const selectPlayerSchema = createSelectSchema(players);
 export const insertRoundSchema = createInsertSchema(rounds);
 export const selectRoundSchema = createSelectSchema(rounds);
+export const insertHighScoreSchema = createInsertSchema(highScores);
+export const selectHighScoreSchema = createSelectSchema(highScores);

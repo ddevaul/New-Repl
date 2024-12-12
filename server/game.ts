@@ -1,5 +1,8 @@
 import { WebSocket } from "ws";
 import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
+import { db } from "../db/index.js";
+import { highScores } from "../db/schema.js";
+import { eq, sql } from "drizzle-orm";
 
 // Pre-defined list of words for the game
 export const WORDS = [
@@ -211,11 +214,43 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           if (message.guess.toLowerCase() === room.word?.toLowerCase()) {
             console.log('Correct guess! Starting new round');
             
-            // Update scores and swap roles
-            room.players = room.players.map(player => ({
-              ...player,
-              score: player.score + (player.isDrawer ? 5 : 10), // Drawer gets 5 points, guesser gets 10
-              isDrawer: !player.isDrawer // Swap roles
+            // Update scores, save to database, and swap roles
+            room.players = await Promise.all(room.players.map(async player => {
+              const newScore = player.score + (player.isDrawer ? 5 : 10); // Drawer gets 5 points, guesser gets 10
+              
+              // Update or create high score
+              try {
+                const existingScore = await db.query.highScores.findFirst({
+                  where: eq(highScores.playerName, player.name)
+                });
+
+                if (existingScore) {
+                  await db.update(highScores)
+                    .set({
+                      score: sql`GREATEST(${existingScore.score}, ${newScore})`,
+                      gamesPlayed: sql`${existingScore.gamesPlayed} + 1`,
+                      totalGuessesCorrect: sql`${existingScore.totalGuessesCorrect} + ${player.isDrawer ? 0 : 1}`,
+                      totalDrawingsGuessed: sql`${existingScore.totalDrawingsGuessed} + ${player.isDrawer ? 1 : 0}`,
+                      updatedAt: new Date()
+                    })
+                    .where(eq(highScores.id, existingScore.id));
+                } else {
+                  await db.insert(highScores).values({
+                    playerName: player.name,
+                    score: newScore,
+                    totalGuessesCorrect: player.isDrawer ? 0 : 1,
+                    totalDrawingsGuessed: player.isDrawer ? 1 : 0
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating high scores:', error);
+              }
+
+              return {
+                ...player,
+                score: newScore,
+                isDrawer: !player.isDrawer // Swap roles
+              };
             }));
 
             // Reset for next round
