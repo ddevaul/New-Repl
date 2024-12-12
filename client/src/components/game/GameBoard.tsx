@@ -80,9 +80,9 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
     );
   }
 
-  const currentPlayer = gameState?.players ? room.players.find(player => 
-    gameState.players.find((p: any) => p.id === player.id)?.isDrawer === player.isDrawer
-  ) : null;
+  const currentPlayer = room.players.find(player => 
+    gameState?.players?.some((p: any) => p.id === player.id && p.isDrawer === player.isDrawer)
+  );
   const isDrawer = currentPlayer?.isDrawer ?? false;
 
   return (

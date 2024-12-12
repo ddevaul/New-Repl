@@ -6,10 +6,10 @@ import GameBoard from "@/components/game/GameBoard";
 import { useWebSocket } from "@/lib/websocket";
 
 export default function Room() {
-  const [match, params] = useRoute<{ code: string }>("/room/:code");
+  const [, params] = useRoute<{ code: string }>("/room/:code");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const code = params?.code;
+  const code = params?.code?.toUpperCase();
 
   const { data: room, error } = useQuery({
     queryKey: ["/api/rooms", code],
