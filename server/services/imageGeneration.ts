@@ -4,12 +4,15 @@ const PLACEHOLDER_IMAGE = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWl
 
 export async function generateImage(prompt: string): Promise<string> {
   try {
-    if (!process.env.STABILITY_API_KEY) {
-      console.warn('STABILITY_API_KEY is not set - using placeholder image');
+    const apiKey = process.env.STABILITY_API_KEY;
+    if (!apiKey || apiKey.trim() === '') {
+      console.warn('STABILITY_API_KEY is not set or empty - using placeholder image');
       return PLACEHOLDER_IMAGE;
     }
 
     console.log('Generating image with prompt:', prompt);
+    console.log('API Key present:', !!apiKey);
+    console.log('API Key length:', apiKey?.length);
 
     const response = await fetch(
       `https://api.stability.ai/v1/generation/${config.stabilityApi.engineId}/text-to-image`,
@@ -18,7 +21,7 @@ export async function generateImage(prompt: string): Promise<string> {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Bearer ${process.env.STABILITY_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           text_prompts: [{ text: prompt }],
