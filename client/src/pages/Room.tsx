@@ -35,6 +35,8 @@ export default function Room() {
     enabled: !!code
   });
 
+  const socket = useWebSocket(code, playerId);
+
   // Update room state when receiving WebSocket messages
   useEffect(() => {
     if (!socket) return;
@@ -54,8 +56,6 @@ export default function Room() {
     socket.addEventListener("message", handleMessage);
     return () => socket.removeEventListener("message", handleMessage);
   }, [socket]);
-
-  const socket = useWebSocket(code, playerId);
 
   useEffect(() => {
     if (error) {
