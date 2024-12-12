@@ -6,18 +6,19 @@ import GameBoard from "@/components/game/GameBoard";
 import { useWebSocket } from "@/lib/websocket";
 
 export default function Room() {
-  const params = useParams<{ code: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
-  const code = params?.code;
+  const params = useParams<{ code?: string }>();
+  const code = params?.code || '';
 
   useEffect(() => {
     if (!code) {
       toast({
         title: "Error",
         description: "Invalid room code",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000
       });
       setLocation("/");
       return;
@@ -25,7 +26,7 @@ export default function Room() {
     setIsLoading(false);
   }, [code, setLocation, toast]);
 
-  const roomCode = code?.toUpperCase();
+  const roomCode = code.toUpperCase();
 
   const { data: room, error } = useQuery({
     queryKey: ["/api/rooms", roomCode],

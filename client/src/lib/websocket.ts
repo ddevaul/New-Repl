@@ -6,15 +6,20 @@ export function useWebSocket(roomCode: string | undefined) {
   const { toast } = useToast();
 
   const connect = useCallback(() => {
-    if (!roomCode) return null;
-
-    if (!roomCode) return null;
+    if (!roomCode?.trim()) {
+      console.log('No room code provided, skipping WebSocket connection');
+      return null;
+    }
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const ws = new WebSocket(`${protocol}//${host}/ws/room/${roomCode.toUpperCase()}`);
+    const wsPath = `/ws/room/${roomCode.trim().toUpperCase()}`;
+    const wsUrl = `${protocol}//${host}${wsPath}`;
     
-    console.log('Attempting WebSocket connection to:', `${protocol}//${host}/ws/room/${roomCode.toUpperCase()}`);
+    console.log('Attempting WebSocket connection to:', wsUrl);
+    
+    try {
+      const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log('WebSocket Connected');
@@ -64,6 +69,16 @@ export function useWebSocket(roomCode: string | undefined) {
     };
 
     return ws;
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect to game server. Please try again.",
+        variant: "destructive",
+        duration: 4000
+      });
+      return null;
+    }
   }, [roomCode, toast]);
 
   useEffect(() => {
