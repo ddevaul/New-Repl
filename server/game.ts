@@ -1,5 +1,5 @@
 import { WebSocket } from "ws";
-import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration";
+import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
 
 export const WORDS = [
   "elephant", "basketball", "sunshine", "guitar", "rainbow",
@@ -50,9 +50,10 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string) {
 
   // Broadcast game state to all connected clients in the room
   function broadcastGameState() {
+    if (!room) return;
     const state = {
       ...room,
-      attemptsLeft: 3 - (room.drawerPrompts?.length || 0)
+      attemptsLeft: 3 - room.drawerPrompts.length
     };
     connections.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
@@ -74,6 +75,41 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string) {
           // Only drawer can send prompts
           const drawer = room.players.find(p => p.isDrawer);
           if (!drawer) break;
+
+          // Check attempts limit
+          if (room.drawerPrompts.length >= 3) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'No more attempts left. Round is over!'
+            }));
+            
+            // Start new round without points
+            room.players = room.players.map(player => ({
+              ...player,
+              isDrawer: !player.isDrawer // Swap roles
+            }));
+
+            // Reset for next round
+            room.currentRound += 1;
+            room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+            room.drawerPrompts = [];
+            room.guesses = [];
+            room.currentImage = null;
+            room.attemptsLeft = 3;
+
+            // Notify all clients about round end
+            connections.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                  type: 'roundComplete',
+                  message: `Out of attempts! The word was "${room.word}". No points awarded. Swapping roles...`
+                }));
+              }
+            });
+            
+            broadcastGameState();
+            break;
+          }
 
           console.log('Processing prompt:', message.prompt);
           
@@ -112,8 +148,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string) {
             // Update scores and swap roles
             room.players = room.players.map(player => ({
               ...player,
-              score: player.score + (player.isDrawer ? 5 : 10),
-              isDrawer: !player.isDrawer
+              score: player.score + (player.isDrawer ? 5 : 10), // Drawer gets 5 points, guesser gets 10
+              isDrawer: !player.isDrawer // Swap roles
             }));
 
             // Reset for next round
