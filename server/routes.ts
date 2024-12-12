@@ -77,14 +77,27 @@ export function registerRoutes(app: Express): Server {
 
   // WebSocket handling
   httpServer.on("upgrade", (request, socket, head) => {
-    if (!request.url) return socket.destroy();
+    if (!request.url) {
+      console.log('WebSocket upgrade failed: No URL in request');
+      return socket.destroy();
+    }
+
+    // Skip vite HMR connections
+    if (request.headers['sec-websocket-protocol']?.includes('vite-hmr')) {
+      return;
+    }
 
     const match = request.url.match(/^\/ws\/room\/([A-Z0-9]{6})$/);
-    if (!match) return socket.destroy();
+    if (!match) {
+      console.log('WebSocket upgrade failed: Invalid URL format:', request.url);
+      return socket.destroy();
+    }
 
-    const roomCode = match[1];
+    const roomCode = match[1].toUpperCase();
+    console.log('WebSocket upgrade request for room:', roomCode);
 
     wss.handleUpgrade(request, socket, head, (ws) => {
+      console.log('WebSocket connection established for room:', roomCode);
       setupGameHandlers(ws, roomCode, db);
     });
   });

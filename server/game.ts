@@ -12,8 +12,30 @@ const WORDS = [
 
 type DrizzleClient = NeonDatabase<typeof schema>;
 
+// Track WebSocket connections for each room
+const roomConnections = new Map<string, Set<WebSocket>>();
+
 export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleClient) {
   let gameState: any = null;
+
+  // Add this connection to the room
+  if (!roomConnections.has(roomCode)) {
+    roomConnections.set(roomCode, new Set());
+  }
+  roomConnections.get(roomCode)?.add(ws);
+
+  // Broadcast to all clients in the room except sender
+  const broadcast = (data: any, excludeWs?: WebSocket) => {
+    const connections = roomConnections.get(roomCode);
+    if (!connections) return;
+
+    const message = JSON.stringify(data);
+    for (const client of connections) {
+      if (client !== excludeWs && client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    }
+  };
 
   const updateGameState = async () => {
     try {
@@ -35,18 +57,13 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         return;
       }
 
-      // Broadcast player join event
+      // Notify all players about new joins
       if (!gameState) {
-        ws.send(JSON.stringify({
+        broadcast({
           type: 'playerUpdate',
           joined: true,
           playerName: room.players[room.players.length - 1]?.name
-        }));
-      }
-
-      if (!room) {
-        console.error(`Room not found: ${roomCode}`);
-        return;
+        }, ws);
       }
 
       // Create initial round if none exists
@@ -73,7 +90,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         guessData: room.rounds[0]?.guessData ? JSON.parse(room.rounds[0].guessData) : []
       };
 
-      ws.send(JSON.stringify(gameState));
+      // Send game state to all connected clients
+      broadcast(gameState);
     } catch (error) {
       console.error('Failed to update game state:', error);
       ws.send(JSON.stringify({ error: 'Failed to update game state' }));
@@ -107,15 +125,15 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         })
         .where(eq(rounds.id, round.id));
 
-      // First send a loading state
-      ws.send(JSON.stringify({
+      // Broadcast loading state to all players
+      broadcast({
         ...gameState,
         currentImage: null,
         attemptsLeft: gameState.attemptsLeft - 1,
         error: null
-      }));
+      });
 
-      // Then send the actual image once generated
+      // Update game state with the generated image
       gameState = {
         ...gameState,
         currentImage: imageUrl,
@@ -123,15 +141,9 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         error: imageUrl === PLACEHOLDER_IMAGE ? "Image generation failed. Please try again once API key is configured." : null
       };
 
-      // Send final state with image to client
-      ws.send(JSON.stringify(gameState));
+      // Broadcast final state with image to all players
+      broadcast(gameState);
       
-      // Log success
-      console.log('Successfully handled prompt:', {
-        roomId: gameState.roomId,
-        attemptsLeft: gameState.attemptsLeft,
-        hasImage: !!gameState.currentImage
-      });
     } catch (error) {
       console.error('Failed to handle prompt:', error);
       ws.send(JSON.stringify({ 
@@ -170,7 +182,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         })
         .where(eq(rounds.id, round.id));
 
-      // Immediately broadcast the updated game state to all players
+      // Broadcast updated game state to all players
       await updateGameState();
 
       if (formattedGuess.isCorrect) {
@@ -208,12 +220,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
           .set({ currentRound: gameState.currentRound + 1 })
           .where(eq(rooms.id, gameState.roomId));
 
-        // Send a success message to the client
-        ws.send(JSON.stringify({
+        // Broadcast round completion to all players
+        broadcast({
           type: 'roundComplete',
           message: 'Correct guess! Starting new round...',
           pointsEarned: { guesser: 10, drawer: 5 }
-        }));
+        });
       }
 
       await updateGameState();
@@ -242,6 +254,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
   ws.on("close", async () => {
     try {
+      // Remove this connection from the room
+      roomConnections.get(roomCode)?.delete(ws);
+      if (roomConnections.get(roomCode)?.size === 0) {
+        roomConnections.delete(roomCode);
+      }
+
       const room = await db.query.rooms.findFirst({
         where: eq(rooms.code, roomCode),
         with: {
@@ -251,11 +269,11 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
       if (room) {
         // Notify remaining players about disconnection
-        ws.send(JSON.stringify({
+        broadcast({
           type: 'playerUpdate',
           joined: false,
           playerName: room.players[room.players.length - 1]?.name
-        }));
+        }, ws);
       }
     } catch (error) {
       console.error('Error handling WebSocket close:', error);

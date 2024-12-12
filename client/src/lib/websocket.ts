@@ -8,9 +8,13 @@ export function useWebSocket(roomCode: string | undefined) {
   const connect = useCallback(() => {
     if (!roomCode) return null;
 
+    if (!roomCode) return null;
+    
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host.includes('localhost') ? 'localhost:5000' : window.location.host;
-    const ws = new WebSocket(`${protocol}//${host}/ws/room/${roomCode}`);
+    const host = window.location.host;
+    const ws = new WebSocket(`${protocol}//${host}/ws/room/${roomCode.toUpperCase()}`);
+    
+    console.log('Attempting WebSocket connection to:', `${protocol}//${host}/ws/room/${roomCode.toUpperCase()}`);
 
     ws.onopen = () => {
       console.log('WebSocket Connected');
