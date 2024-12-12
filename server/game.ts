@@ -1,7 +1,7 @@
 import type { WebSocket } from "ws";
 import { rooms, players, rounds } from "../db/schema";
 import { eq } from "drizzle-orm";
-import { generateImage } from "./services/imageGeneration";
+import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration";
 import { type NeonDatabase } from 'drizzle-orm/neon-serverless';
 import * as schema from "../db/schema";
 
