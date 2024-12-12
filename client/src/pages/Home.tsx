@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import WordManager from "@/components/game/WordManager";
+
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -78,7 +78,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl space-y-6">
+      <div className="w-full max-w-md">
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
@@ -121,8 +121,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        {/* Word Category Manager */}
-        <WordManager />
+        
       </div>
     </div>
   );

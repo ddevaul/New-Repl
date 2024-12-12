@@ -2,123 +2,23 @@ import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js"
 import { WebSocket } from "ws";
 // Game state is managed in memory
 
-// Type definitions for word lists
-export type WordCategory = {
-  name: string;
-  description?: string;
-  words: string[];
-  isCustom?: boolean;
-};
+// Default word list for auto-generation
+const DEFAULT_WORDS = [
+  "elephant", "penguin", "guitar", "rainbow", "wizard",
+  "spaceship", "mountain", "butterfly", "robot", "pizza",
+  "dragon", "unicorn", "beach", "ninja", "astronaut",
+  "lighthouse", "volcano", "mermaid", "submarine", "forest",
+  "dinosaur", "rocket", "pirate", "tornado", "explorer"
+];
 
-export type WordLists = {
-  [key: string]: WordCategory;
-};
+// Function to get a random word
+export function getRandomWord(): string {
+  return DEFAULT_WORDS[Math.floor(Math.random() * DEFAULT_WORDS.length)];
+}
 
-// Initialize with default word lists
-export const WORD_LISTS: WordLists = {
-  animals: {
-    name: "Animals",
-    description: "Various animals including mythical creatures",
-    words: [
-      "elephant", "penguin", "giraffe", "dolphin", "kangaroo",
-      "butterfly", "octopus", "panda", "tiger", "koala",
-      "dragon", "unicorn", "dinosaur", "whale", "lion"
-    ]
-  },
-  objects: {
-    name: "Objects",
-    description: "Common and interesting objects",
-    words: [
-      "guitar", "basketball", "spaceship", "lighthouse", "pizza",
-      "camera", "umbrella", "telescope", "compass", "backpack",
-      "laptop", "bicycle", "helicopter", "submarine", "rocket"
-    ]
-  },
-  nature: {
-    name: "Nature",
-    description: "Natural phenomena and landscapes",
-    words: [
-      "rainbow", "sunshine", "waterfall", "volcano", "mountain",
-      "forest", "beach", "desert", "glacier", "canyon",
-      "island", "tornado", "aurora", "jungle", "oasis"
-    ]
-  },
-  characters: {
-    name: "Characters",
-    description: "Various professions and fictional characters",
-    words: [
-      "wizard", "astronaut", "pirate", "mermaid", "ninja",
-      "superhero", "viking", "robot", "alien", "knight",
-      "fairy", "cowboy", "scientist", "chef", "explorer"
-    ]
-  }
-};
-
-// Validate word before adding
+// Validate word input
 function validateWord(word: string): boolean {
-  return word.length >= 3 && word.length <= 20 && /^[a-zA-Z\s-]+$/.test(word);
-}
-
-// Add a new word to an existing category
-export function addWordToCategory(categoryId: string, word: string): boolean {
-  if (!validateWord(word)) {
-    console.log(`Invalid word format: ${word}`);
-    return false;
-  }
-
-  const category = WORD_LISTS[categoryId];
-  if (!category) {
-    console.log(`Category not found: ${categoryId}`);
-    return false;
-  }
-
-  if (category.words.includes(word.toLowerCase())) {
-    console.log(`Word already exists in category: ${word}`);
-    return false;
-  }
-
-  category.words.push(word.toLowerCase());
-  return true;
-}
-
-// Add a new category
-export function addCategory(categoryId: string, name: string, description?: string): boolean {
-  if (WORD_LISTS[categoryId]) {
-    console.log(`Category already exists: ${categoryId}`);
-    return false;
-  }
-
-  WORD_LISTS[categoryId] = {
-    name,
-    description,
-    words: [],
-    isCustom: true
-  };
-  return true;
-}
-
-// Get available categories
-export function getCategories(): { id: string; name: string; wordCount: number; isCustom?: boolean }[] {
-  return Object.entries(WORD_LISTS).map(([id, category]) => ({
-    id,
-    name: category.name,
-    wordCount: category.words.length,
-    isCustom: category.isCustom
-  }));
-}
-
-// Function to get a random word from all categories or a specific category
-export function getRandomWord(categoryId?: string): string {
-  if (categoryId && categoryId in WORD_LISTS) {
-    const category = WORD_LISTS[categoryId];
-    return category.words[Math.floor(Math.random() * category.words.length)];
-  }
-  
-  // If no category specified or invalid category, pick from all categories
-  const allCategories = Object.keys(WORD_LISTS);
-  const randomCategory = allCategories[Math.floor(Math.random() * allCategories.length)];
-  const words = WORD_LISTS[randomCategory].words;
-  return words[Math.floor(Math.random() * words.length)];
+  return word.length >= 2 && word.length <= 30 && /^[a-zA-Z0-9\s-]+$/.test(word);
 }
 
 export type Player = {
@@ -223,6 +123,41 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
       console.log('Received message:', message, 'from room:', roomCode);
 
       switch (message.type) {
+        case 'setWord':
+          if (!message.word || !validateWord(message.word)) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Invalid word format'
+            }));
+            break;
+          }
+          
+          const wordSetter = room.players.find(p => p.isDrawer);
+          if (!wordSetter || wordSetter.id !== playerId) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Only the drawer can set the word'
+            }));
+            break;
+          }
+
+          room.word = message.word;
+          broadcastGameState();
+          break;
+
+        case 'generateWord':
+          const wordGenerator = room.players.find(p => p.isDrawer);
+          if (!wordGenerator || wordGenerator.id !== playerId) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Only the drawer can generate a word'
+            }));
+            break;
+          }
+
+          room.word = getRandomWord();
+          broadcastGameState();
+          break;
         case 'prompt':
           if (!message.prompt) break;
           

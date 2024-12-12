@@ -5,10 +5,7 @@ import {
   rooms, 
   type Room, 
   setupGameHandlers, 
-  getRandomWord,
-  getCategories,
-  addCategory,
-  addWordToCategory
+  getRandomWord
 } from "./game.js";
 import { db } from "../db/index.js";
 import { highScores } from "../db/schema.js";
@@ -32,47 +29,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get word categories
-  app.get("/api/categories", (req, res) => {
-    try {
-      const categories = getCategories();
-      res.json(categories);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      res.status(500).json({ message: "Failed to fetch categories" });
-    }
-  });
-
-  // Add new category
-  app.post("/api/categories", (req, res) => {
-    const { categoryId, name, description } = req.body;
-    
-    if (!categoryId || !name) {
-      return res.status(400).json({ message: "Category ID and name are required" });
-    }
-
-    if (addCategory(categoryId, name, description)) {
-      res.json({ message: "Category added successfully" });
-    } else {
-      res.status(400).json({ message: "Failed to add category" });
-    }
-  });
-
-  // Add word to category
-  app.post("/api/categories/:categoryId/words", (req, res) => {
-    const { categoryId } = req.params;
-    const { word } = req.body;
-
-    if (!word) {
-      return res.status(400).json({ message: "Word is required" });
-    }
-
-    if (addWordToCategory(categoryId, word)) {
-      res.json({ message: "Word added successfully" });
-    } else {
-      res.status(400).json({ message: "Failed to add word" });
-    }
-  });
+  
 
   // Create room
   app.post("/api/rooms", (req, res) => {
