@@ -45,24 +45,31 @@ export default function AuthForm() {
     },
   });
 
-  const onSubmit = async (data: AuthFormValues) => {
+  const handleSubmit = async (data: AuthFormValues) => {
     try {
       setLoading(true);
-      console.log("Submitting form:", { ...data, password: "[REDACTED]" });
-      
+      console.log("Form submission started");
+
       const response = await fetch(`/api/auth/${isLogin ? 'login' : 'signup'}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(isLogin ? {
+          email: data.email,
+          password: data.password
+        } : data),
       });
 
+      console.log("Response received:", response.status);
+      
       const result = await response.json();
       
       if (!response.ok) {
         throw new Error(result.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`);
       }
 
-      console.log("Auth success:", { ...result, token: "[REDACTED]" });
+      console.log("Authentication successful");
       
       toast({
         title: "Success",
@@ -99,7 +106,7 @@ export default function AuthForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             {!isLogin && (
               <FormField
                 control={form.control}
@@ -141,7 +148,15 @@ export default function AuthForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={loading}
+              onClick={(e) => {
+                e.preventDefault();
+                form.handleSubmit(handleSubmit)();
+              }}
+            >
               {loading ? "Please wait..." : (isLogin ? "Log In" : "Sign Up")}
             </Button>
           </form>
