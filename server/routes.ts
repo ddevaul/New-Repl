@@ -38,7 +38,10 @@ export function registerRoutes(app: Express): Server {
     
     rooms.set(code, room);
     console.log(`Created room ${code} with word "${room.word}"`);
-    res.json({ code: room.code });
+    res.json({ 
+      code: room.code,
+      playerId: room.players[0].id // Return the creator's player ID
+    });
   });
 
   // Join room

@@ -44,10 +44,21 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
   // Extract playerId from URL query parameters
   const playerIdMatch = url.match(/playerId=(\d+)/);
-  const playerId = playerIdMatch ? parseInt(playerIdMatch[1]) : null;
+  const playerId = playerIdMatch ? parseInt(playerIdMatch[1], 10) : null;
 
   if (!playerId) {
+    console.error('No player ID provided in WebSocket connection');
     ws.send(JSON.stringify({ error: 'Player ID not found' }));
+    ws.close();
+    return;
+  }
+
+  // Find the connecting player in the room
+  const connectingPlayer = room.players.find(p => p.id === playerId);
+  if (!connectingPlayer) {
+    console.error(`Player ${playerId} attempted to connect but is not in room ${roomCode}`);
+    ws.send(JSON.stringify({ error: 'You are not a member of this room' }));
+    ws.close();
     return;
   }
 
@@ -58,14 +69,17 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
   const connections = roomConnections.get(roomCode)!;
   connections.set(playerId, ws);
 
+  // Log successful connection
+  console.log(`Player ${connectingPlayer.name} (${playerId}) connected as ${connectingPlayer.isDrawer ? 'drawer' : 'guesser'} in room ${roomCode}`);
+
   // Broadcast game state to all connected clients in the room
   function broadcastGameState() {
     if (!room) return;
     
     connections.forEach((client, pid) => {
       if (client.readyState === WebSocket.OPEN) {
-        const player = room.players.find(p => p.id === pid);
-        if (!player) return;
+        const currentPlayer = room.players.find(p => p.id === pid);
+        if (!currentPlayer) return;
 
         const state = {
           ...room,
@@ -79,7 +93,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
         };
 
         // Only send word to the drawer
-        if (!player.isDrawer) {
+        if (!currentPlayer.isDrawer) {
           delete state.word;
         }
 
@@ -211,23 +225,14 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
     room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
   }
 
-  // Verify player is in the room and has correct role
-  const player = room.players.find(p => p.id === playerId);
-  if (!player) {
-    console.error(`Player ${playerId} not found in room ${roomCode}`);
-    ws.send(JSON.stringify({ error: 'Player not found in room' }));
-    ws.close();
-    return;
-  }
-
-  console.log(`Player ${player.name} (${player.id}) connected as ${player.isDrawer ? 'drawer' : 'guesser'}`);
+  // Send initial game state
   broadcastGameState();
 
   // Cleanup on disconnect
   ws.on("close", () => {
-    console.log(`Player ${player.name} (${player.id}) disconnected from room ${roomCode}`);
+    console.log(`Player ${connectingPlayer.name} (${playerId}) disconnected from room ${roomCode}`);
     
-    // Find and remove the connection associated with this player
+    // Remove the connection
     connections.delete(playerId);
     
     // If no more connections in the room, clean up
