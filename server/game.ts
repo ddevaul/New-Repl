@@ -1,4 +1,5 @@
 import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
+import { type WebSocket } from "ws";
 // Game state is managed in memory
 
 // Organized word lists by category
@@ -60,7 +61,8 @@ export type Room = {
 };
 
 // Keep track of WebSocket connections for each room
-const roomConnections = new Map<string, Map<number, WebSocket>>();
+import { WebSocket as WSWebSocket } from "ws";
+const roomConnections = new Map<string, Map<number, WSWebSocket>>();
 
 // Store active game rooms
 export const rooms = new Map<string, Room>();
