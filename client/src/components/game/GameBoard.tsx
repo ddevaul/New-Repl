@@ -93,10 +93,17 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
     );
   }
 
-  const currentPlayer = room.players.find(player => 
-    gameState?.players?.some((p: any) => p.id === player.id && p.isDrawer === player.isDrawer)
-  );
+  // Find the current player based on the session storage ID
+  const playerId = parseInt(sessionStorage.getItem('playerId') || '0', 10);
+  const currentPlayer = room.players.find(player => player.id === playerId);
   const isDrawer = currentPlayer?.isDrawer ?? false;
+
+  console.log('GameBoard - Current player:', {
+    playerId,
+    currentPlayer,
+    isDrawer,
+    allPlayers: room.players
+  });
 
   return (
     <Card className="p-8">

@@ -51,20 +51,25 @@ export default function Room() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">Room Code: {code}</h1>
-          <div className="flex gap-2">
-            {room.players.map((player: { id: number; name: string; isDrawer: boolean }) => (
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">Room Code: {code}</h1>
+            <p className="text-sm text-muted-foreground">
+              {playerId ? `Your ID: ${playerId}` : 'Connecting...'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {room.players.map((player) => (
               <div
                 key={player.id}
-                className="px-4 py-2 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg flex items-center gap-2"
+                className={`px-4 py-2 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg flex items-center gap-2 ${
+                  player.id === playerId ? 'ring-2 ring-primary' : ''
+                }`}
               >
                 <span className="font-medium">{player.name}</span>
-                {player.isDrawer && (
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                    Drawing
-                  </span>
-                )}
+                <span className={`text-xs ${player.isDrawer ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'} px-2 py-1 rounded-full`}>
+                  {player.isDrawer ? 'Drawing' : 'Guessing'}
+                </span>
               </div>
             ))}
           </div>
