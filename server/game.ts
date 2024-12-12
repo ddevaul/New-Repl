@@ -12,98 +12,51 @@ const WORDS = [
 
 type DrizzleClient = NeonDatabase<typeof schema>;
 
-// Track WebSocket connections for each room
-const roomConnections = new Map<string, Set<WebSocket>>();
-
 export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleClient) {
   let gameState: any = null;
 
-  // Add this connection to the room
-  if (!roomConnections.has(roomCode)) {
-    roomConnections.set(roomCode, new Set());
-  }
-  roomConnections.get(roomCode)?.add(ws);
-
-  // Broadcast to all clients in the room except sender
-  const broadcast = (data: any, excludeWs?: WebSocket) => {
-    const connections = roomConnections.get(roomCode);
-    if (!connections) return;
-
-    const message = JSON.stringify(data);
-    for (const client of connections) {
-      if (client !== excludeWs && client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    }
-  };
-
   const updateGameState = async () => {
     try {
-      // First get the room with players
       const room = await db.query.rooms.findFirst({
         where: eq(rooms.code, roomCode),
         with: {
-          players: true
+          players: true,
+          rounds: {
+            where: eq(rounds.isCompleted, false),
+            limit: 1
+          }
         }
       });
 
       if (!room) {
         console.error(`Room not found: ${roomCode}`);
-        ws.close();
         return;
       }
 
-      // Then get the latest active round
-      const latestRound = await db.query.rounds.findFirst({
-        where: eq(rounds.roomId, room.id),
-        orderBy: (rounds, { desc }) => [desc(rounds.id)]
-      });
-
-      // Notify all players about new joins
-      if (!gameState) {
-        broadcast({
-          type: 'playerUpdate',
-          joined: true,
-          playerName: room.players[room.players.length - 1]?.name
-        }, ws);
-      }
-
       // Create initial round if none exists
-      if (!latestRound) {
+      if (!room.rounds || room.rounds.length === 0) {
         const word = WORDS[Math.floor(Math.random() * WORDS.length)];
-        const [newRound] = await db.insert(rounds).values({
+        await db.insert(rounds).values({
           roomId: room.id,
           word,
           drawerPrompts: [],
-          guesses: [],
-          guessData: '[]'
-        }).returning();
-        
-        gameState = {
-          roomId: room.id,
-          currentRound: room.currentRound,
-          players: room.players,
-          word: newRound.word,
-          attemptsLeft: 3,
-          currentImage: null,
-          guessData: []
-        };
-      } else {
-        gameState = {
-          roomId: room.id,
-          currentRound: room.currentRound,
-          players: room.players,
-          word: latestRound.word,
-          attemptsLeft: 3 - (latestRound.drawerPrompts?.length || 0),
-          currentImage: latestRound.drawerPrompts?.length 
-            ? await generateImage(latestRound.drawerPrompts[latestRound.drawerPrompts.length - 1])
-            : null,
-          guessData: latestRound.guessData ? JSON.parse(latestRound.guessData) : []
-        };
+          guesses: []
+        });
+        return updateGameState();
       }
 
-      // Send game state to all connected clients
-      broadcast(gameState);
+      gameState = {
+        roomId: room.id,
+        currentRound: room.currentRound,
+        players: room.players,
+        word: room.rounds[0]?.word,
+        attemptsLeft: 3 - (room.rounds[0]?.drawerPrompts?.length || 0),
+        currentImage: room.rounds[0]?.drawerPrompts?.length 
+          ? await generateImage(room.rounds[0].drawerPrompts[room.rounds[0].drawerPrompts.length - 1])
+          : null
+      };
+
+      ws.send(JSON.stringify(gameState));
     } catch (error) {
       console.error('Failed to update game state:', error);
       ws.send(JSON.stringify({ error: 'Failed to update game state' }));
@@ -137,15 +90,15 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         })
         .where(eq(rounds.id, round.id));
 
-      // Broadcast loading state to all players
-      broadcast({
+      // First send a loading state
+      ws.send(JSON.stringify({
         ...gameState,
         currentImage: null,
         attemptsLeft: gameState.attemptsLeft - 1,
         error: null
-      });
+      }));
 
-      // Update game state with the generated image
+      // Then send the actual image once generated
       gameState = {
         ...gameState,
         currentImage: imageUrl,
@@ -153,9 +106,15 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         error: imageUrl === PLACEHOLDER_IMAGE ? "Image generation failed. Please try again once API key is configured." : null
       };
 
-      // Broadcast final state with image to all players
-      broadcast(gameState);
+      // Send final state with image to client
+      ws.send(JSON.stringify(gameState));
       
+      // Log success
+      console.log('Successfully handled prompt:', {
+        roomId: gameState.roomId,
+        attemptsLeft: gameState.attemptsLeft,
+        hasImage: !!gameState.currentImage
+      });
     } catch (error) {
       console.error('Failed to handle prompt:', error);
       ws.send(JSON.stringify({ 
@@ -175,29 +134,14 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
       if (!round) return;
 
-      const guessingPlayer = gameState.players.find((p: any) => !p.isDrawer);
-      const formattedGuess = {
-        playerId: guessingPlayer.id,
-        playerName: guessingPlayer.name,
-        guess,
-        isCorrect: guess.toLowerCase() === round.word.toLowerCase()
-      };
-
-      const currentGuessData = round.guessData ? JSON.parse(round.guessData) : [];
-      const updatedGuessData = [...currentGuessData, formattedGuess];
-
       await db.update(rounds)
         .set({
           guesses: [...(round.guesses || []), guess],
-          guessData: JSON.stringify(updatedGuessData),
-          isCompleted: formattedGuess.isCorrect
+          isCompleted: guess.toLowerCase() === round.word.toLowerCase()
         })
         .where(eq(rounds.id, round.id));
 
-      // Broadcast updated game state to all players
-      await updateGameState();
-
-      if (formattedGuess.isCorrect) {
+      if (guess.toLowerCase() === round.word.toLowerCase()) {
         // Update score for the guesser
         const guessingPlayer = gameState.players.find((p: any) => !p.isDrawer);
         if (guessingPlayer) {
@@ -232,12 +176,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
           .set({ currentRound: gameState.currentRound + 1 })
           .where(eq(rooms.id, gameState.roomId));
 
-        // Broadcast round completion to all players
-        broadcast({
+        // Send a success message to the client
+        ws.send(JSON.stringify({
           type: 'roundComplete',
           message: 'Correct guess! Starting new round...',
           pointsEarned: { guesser: 10, drawer: 5 }
-        });
+        }));
       }
 
       await updateGameState();
@@ -264,32 +208,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
     }
   });
 
-  ws.on("close", async () => {
-    try {
-      // Remove this connection from the room
-      roomConnections.get(roomCode)?.delete(ws);
-      if (roomConnections.get(roomCode)?.size === 0) {
-        roomConnections.delete(roomCode);
-      }
-
-      const room = await db.query.rooms.findFirst({
-        where: eq(rooms.code, roomCode),
-        with: {
-          players: true
-        }
-      });
-
-      if (room) {
-        // Notify remaining players about disconnection
-        broadcast({
-          type: 'playerUpdate',
-          joined: false,
-          playerName: room.players[room.players.length - 1]?.name
-        }, ws);
-      }
-    } catch (error) {
-      console.error('Error handling WebSocket close:', error);
-    }
+  ws.on("close", () => {
+    // Cleanup
   });
 
   // Initialize game state
