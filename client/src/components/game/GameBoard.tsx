@@ -97,8 +97,9 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           </p>
         </div>
 
-        <div className="flex justify-center w-full">
-          {gameState.currentImage ? (
+        <div className="grid grid-cols-1 md:grid-cols-[2fr,1fr] gap-6">
+          <div className="flex justify-center w-full">
+            {gameState.currentImage ? (
             <img
               src={gameState.currentImage}
               alt="AI Generated"
@@ -121,6 +122,26 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
               </p>
             </div>
           )}
+          </div>
+          
+          {/* Guesses Panel */}
+          <div className="space-y-4">
+            <div className="p-6 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg space-y-4">
+              <h3 className="font-semibold text-lg">Guesses</h3>
+              <div className="space-y-2">
+                {gameState.guesses?.length > 0 ? (
+                  gameState.guesses.map((guess: any, index: number) => (
+                    <div key={index} className="flex items-start gap-2 text-sm">
+                      <span className="font-medium text-primary">{guess.player}:</span>
+                      <span className="text-muted-foreground">{guess.text}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No guesses yet</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {isDrawer ? (

@@ -1,9 +1,31 @@
 import type { WebSocket } from "ws";
-import { rooms, players, rounds } from "../db/schema";
-import { eq } from "drizzle-orm";
 import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration";
-import { type NeonDatabase } from 'drizzle-orm/neon-serverless';
-import * as schema from "../db/schema";
+
+const WORDS = [
+  "elephant", "basketball", "sunshine", "guitar", "rainbow",
+  "butterfly", "spaceship", "waterfall", "dragon", "pizza"
+];
+type Player = {
+  id: number;
+  name: string;
+  isDrawer: boolean;
+  score: number;
+};
+
+type Room = {
+  id: number;
+  code: string;
+  status: 'waiting' | 'playing' | 'ended';
+  currentRound: number;
+  players: Player[];
+  word?: string;
+  drawerPrompts: string[];
+  guesses: Array<{ text: string; player: string; timestamp: string }>;
+};
+
+const rooms = new Map<string, Room>();
+let nextRoomId = 1;
+let nextPlayerId = 1;
 
 const WORDS = [
   "elephant", "basketball", "sunshine", "guitar", "rainbow",
@@ -12,47 +34,28 @@ const WORDS = [
 
 type DrizzleClient = NeonDatabase<typeof schema>;
 
-export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleClient) {
-  let gameState: any = null;
+export function setupGameHandlers(ws: WebSocket, roomCode: string) {
+  let gameState: Room | null = null;
 
   const updateGameState = async () => {
     try {
-      const room = await db.query.rooms.findFirst({
-        where: eq(rooms.code, roomCode),
-        with: {
-          players: true,
-          rounds: {
-            where: eq(rounds.isCompleted, false),
-            limit: 1
-          }
-        }
-      });
+      const room = rooms.get(roomCode);
 
       if (!room) {
         console.error(`Room not found: ${roomCode}`);
         return;
       }
 
-      // Create initial round if none exists
-      if (!room.rounds || room.rounds.length === 0) {
-        const word = WORDS[Math.floor(Math.random() * WORDS.length)];
-        await db.insert(rounds).values({
-          roomId: room.id,
-          word,
-          drawerPrompts: [],
-          guesses: []
-        });
-        return updateGameState();
+      // Initialize word if not set
+      if (!room.word) {
+        room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
       }
 
       gameState = {
-        roomId: room.id,
-        currentRound: room.currentRound,
-        players: room.players,
-        word: room.rounds[0]?.word,
-        attemptsLeft: 3 - (room.rounds[0]?.drawerPrompts?.length || 0),
-        currentImage: room.rounds[0]?.drawerPrompts?.length 
-          ? await generateImage(room.rounds[0].drawerPrompts[room.rounds[0].drawerPrompts.length - 1])
+        ...room,
+        attemptsLeft: 3 - (room.drawerPrompts?.length || 0),
+        currentImage: room.drawerPrompts?.length 
+          ? await generateImage(room.drawerPrompts[room.drawerPrompts.length - 1])
           : null
       };
 
