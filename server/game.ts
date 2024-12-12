@@ -158,11 +158,35 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           broadcastGameState();
 
           // Generate image
-          const imageUrl = await generateImage(message.prompt);
-          room.currentImage = imageUrl;
-          room.drawerPrompts.push(message.prompt);
-          console.log('Generated image for prompt:', imageUrl === PLACEHOLDER_IMAGE ? 'placeholder' : 'success');
-          broadcastGameState();
+          try {
+            console.log('Attempting to generate image for prompt:', message.prompt);
+            room.currentImage = null; // Set to null to show loading state
+            broadcastGameState(); // Broadcast loading state to clients
+
+            const imageUrl = await generateImage(message.prompt);
+            room.currentImage = imageUrl;
+            room.drawerPrompts.push(message.prompt);
+            
+            if (imageUrl === PLACEHOLDER_IMAGE) {
+              console.warn('Using placeholder image due to generation failure');
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Image generation failed. Please try a different prompt.'
+              }));
+            } else {
+              console.log('Successfully generated image');
+            }
+            
+            broadcastGameState();
+          } catch (error) {
+            console.error('Image generation error:', error);
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Failed to generate image. Please try again.'
+            }));
+            room.currentImage = PLACEHOLDER_IMAGE;
+            broadcastGameState();
+          }
           break;
 
         case 'guess':
