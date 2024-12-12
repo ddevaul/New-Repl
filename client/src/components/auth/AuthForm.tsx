@@ -46,82 +46,66 @@ export default function AuthForm() {
   });
 
   async function onSubmit(values: AuthFormValues) {
-    console.log("Starting form submission with values:", { ...values, password: '***' });
-    
-    if (!values.email || !values.password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      setLoading(true);
-      const endpoint = `/api/auth/${isLogin ? 'login' : 'signup'}`;
-      console.log(`Submitting to endpoint: ${endpoint}`);
+      if (!values.email || !values.password) {
+        toast({
+          title: "Error",
+          description: "Please fill in all required fields",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      const response = await fetch(endpoint, {
+      setLoading(true);
+
+      // Clear any existing auth token
+      localStorage.removeItem('authToken');
+
+      const response = await fetch(`/api/auth/${isLogin ? 'login' : 'signup'}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(isLogin ? {
+        body: JSON.stringify({
           email: values.email,
-          password: values.password
-        } : values),
+          password: values.password,
+          ...(isLogin ? {} : { name: values.name }),
+        }),
       });
 
-      console.log("Response status:", response.status);
-      
-      let result;
-      try {
-        result = await response.json();
-        console.log("Response parsed successfully:", { ...result, token: '***' });
-      } catch (parseError) {
-        console.error("Failed to parse response:", parseError);
-        throw new Error("Server response was not in the expected format");
-      }
-      
+      const data = await response.json();
+
       if (!response.ok) {
-        console.error("Server returned error:", result);
-        throw new Error(result.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`);
+        throw new Error(data.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`);
       }
 
-      if (!result.token) {
-        console.error("No token in response:", result);
-        throw new Error("Invalid server response: no authentication token");
+      if (!data.token) {
+        throw new Error("No authentication token received");
       }
 
-      console.log("Authentication successful, saving token");
-      localStorage.setItem('authToken', result.token);
+      // Save the token and show success message
+      localStorage.setItem('authToken', data.token);
       
       toast({
         title: "Success",
         description: isLogin ? "Successfully logged in!" : "Account created successfully!",
       });
-      
-      console.log("Checking user role:", result.user);
-      if (result.user?.isAdmin) {
-        console.log("Redirecting to admin dashboard");
+
+      // Redirect based on user role
+      if (data.user?.isAdmin) {
         setLocation("/admin");
       } else {
-        console.log("Redirecting to home");
         setLocation("/");
       }
     } catch (error: any) {
-      console.error("Authentication error:", error);
+      console.error("Auth error:", error);
       toast({
         title: "Error",
         description: error.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`,
         variant: "destructive",
       });
-      setLoading(false);
     } finally {
-      if (loading) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }
 

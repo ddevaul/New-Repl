@@ -58,7 +58,13 @@ export async function signup(req: Request, res: Response) {
 
 export async function login(req: Request, res: Response) {
   try {
+    console.log('Login attempt received:', { email: req.body.email });
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      console.log('Missing credentials in request');
+      return res.status(400).json({ message: "Email and password are required" });
+    }
 
     // Find user
     const user = await db.query.users.findFirst({
@@ -66,14 +72,18 @@ export async function login(req: Request, res: Response) {
     });
 
     if (!user) {
-      return res.status(400).send("User not found");
+      console.log('User not found:', email);
+      return res.status(400).json({ message: "Invalid email or password" });
     }
 
     // Check password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(400).send("Invalid password");
+      console.log('Invalid password for user:', email);
+      return res.status(400).json({ message: "Invalid email or password" });
     }
+
+    console.log('Login successful for user:', email);
 
     // Generate JWT
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '24h' });
@@ -90,7 +100,7 @@ export async function login(req: Request, res: Response) {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).send("Error logging in");
+    res.status(500).json({ message: "An error occurred during login" });
   }
 }
 
