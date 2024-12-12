@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import Prompt from "./Prompt";
 import Guess from "./Guess";
+import { useToast } from "@/hooks/use-toast";
 
 interface GameBoardProps {
   socket: WebSocket | null;
@@ -21,6 +22,7 @@ interface GameBoardProps {
 
 export default function GameBoard({ socket, room }: GameBoardProps) {
   const [gameState, setGameState] = useState<any>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!socket) return;
@@ -31,7 +33,11 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
         
         // Handle error messages
         if (data.error) {
-          console.error('Game error:', data.error, data.details);
+          toast({
+            title: "Error",
+            description: data.error,
+            variant: "destructive"
+          });
           return;
         }
 
@@ -49,6 +55,11 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
         setGameState(data);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
+        toast({
+          title: "Error",
+          description: "Something went wrong. Please try again.",
+          variant: "destructive"
+        });
       }
     };
 
