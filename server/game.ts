@@ -134,14 +134,22 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
       if (!round) return;
 
+      const guessingPlayer = gameState.players.find((p: any) => !p.isDrawer);
+      const formattedGuess = {
+        playerId: guessingPlayer.id,
+        playerName: guessingPlayer.name,
+        guess,
+        isCorrect: guess.toLowerCase() === round.word.toLowerCase()
+      };
+
       await db.update(rounds)
         .set({
-          guesses: [...(round.guesses || []), guess],
-          isCompleted: guess.toLowerCase() === round.word.toLowerCase()
+          guesses: [...(round.guesses || []), formattedGuess],
+          isCompleted: formattedGuess.isCorrect
         })
         .where(eq(rounds.id, round.id));
 
-      if (guess.toLowerCase() === round.word.toLowerCase()) {
+      if (formattedGuess.isCorrect) {
         // Update score for the guesser
         const guessingPlayer = gameState.players.find((p: any) => !p.isDrawer);
         if (guessingPlayer) {

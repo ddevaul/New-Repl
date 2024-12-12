@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import Prompt from "./Prompt";
 import Guess from "./Guess";
+import GuessHistory from "./GuessHistory";
 import { useToast } from "@/hooks/use-toast";
 
 interface GameBoardProps {
@@ -46,6 +47,16 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           toast({
             title: "Round Complete!",
             description: data.message,
+            variant: "default"
+          });
+          return;
+        }
+
+        // Handle player join/leave
+        if (data.type === 'playerUpdate') {
+          toast({
+            title: data.joined ? "Player Joined" : "Player Left",
+            description: `${data.playerName} has ${data.joined ? 'joined' : 'left'} the game`,
             variant: "default"
           });
           return;
@@ -97,44 +108,70 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           </p>
         </div>
 
-        <div className="flex justify-center w-full">
-          {gameState.currentImage ? (
-            <img
-              src={gameState.currentImage}
-              alt="AI Generated"
-              className="w-full max-w-[1024px] aspect-square rounded-lg object-cover"
-            />
-          ) : (
-            <div className="w-full max-w-[1024px] aspect-square rounded-lg bg-muted/50 backdrop-blur-sm border border-muted flex flex-col items-center justify-center p-8 space-y-4">
-              {!gameState.error && (
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent shadow-lg"></div>
-              )}
-              <p className="text-lg text-center max-w-md">
-                {gameState.error ? (
-                  <span className="inline-flex items-center gap-2 text-destructive">
-                    <span className="font-semibold">Error:</span>
-                    {gameState.error}
-                  </span>
-                ) : (
-                  <span className="animate-pulse">Generating your masterpiece...</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            {gameState.currentImage ? (
+              <img
+                src={gameState.currentImage}
+                alt="AI Generated"
+                className="w-full aspect-square rounded-lg object-cover"
+              />
+            ) : (
+              <div className="w-full aspect-square rounded-lg bg-muted/50 backdrop-blur-sm border border-muted flex flex-col items-center justify-center p-8 space-y-4">
+                {!gameState.error && (
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent shadow-lg"></div>
                 )}
-              </p>
+                <p className="text-lg text-center max-w-md">
+                  {gameState.error ? (
+                    <span className="inline-flex items-center gap-2 text-destructive">
+                      <span className="font-semibold">Error:</span>
+                      {gameState.error}
+                    </span>
+                  ) : (
+                    <span className="animate-pulse">Generating your masterpiece...</span>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-8">
+            <div className="p-6 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg space-y-4">
+              <h3 className="text-lg font-semibold">Players</h3>
+              <div className="space-y-3">
+                {room.players.map((player) => (
+                  <div key={player.id} className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${player.isDrawer ? "bg-primary" : "bg-muted-foreground"}`} />
+                    <span>{player.name}</span>
+                    <span className="text-muted-foreground ml-auto">
+                      {player.isDrawer ? "Drawing" : "Guessing"}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
+
+            <GuessHistory 
+              guesses={gameState.guesses || []}
+              currentPlayerId={room.players.find(p => !p.isDrawer)?.id}
+            />
+          </div>
         </div>
 
-        {isDrawer ? (
-          <Prompt
-            socket={socket}
-            word={gameState.word}
-            attemptsLeft={gameState.attemptsLeft}
-          />
-        ) : (
-          <Guess
-            socket={socket}
-            attemptsLeft={gameState.attemptsLeft}
-          />
-        )}
+        <div className="mt-8">
+          {isDrawer ? (
+            <Prompt
+              socket={socket}
+              word={gameState.word}
+              attemptsLeft={gameState.attemptsLeft}
+            />
+          ) : (
+            <Guess
+              socket={socket}
+              attemptsLeft={gameState.attemptsLeft}
+            />
+          )}
+        </div>
       </div>
     </Card>
   );
