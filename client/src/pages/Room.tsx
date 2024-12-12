@@ -22,7 +22,9 @@ export default function Room() {
     return id;
   });
 
-  const { data: room, error } = useQuery({
+  const [roomState, setRoomState] = useState(null);
+  
+  const { data: initialRoom, error } = useQuery({
     queryKey: ["/api/rooms", code],
     queryFn: async () => {
       if (!code) throw new Error("Room code is required");
@@ -32,6 +34,26 @@ export default function Room() {
     },
     enabled: !!code
   });
+
+  // Update room state when receiving WebSocket messages
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (!data.error && !data.type) {
+          // Only update room state for game state messages
+          setRoomState(data);
+        }
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
+
+    socket.addEventListener("message", handleMessage);
+    return () => socket.removeEventListener("message", handleMessage);
+  }, [socket]);
 
   const socket = useWebSocket(code, playerId);
 
@@ -46,6 +68,9 @@ export default function Room() {
     }
   }, [error, setLocation, toast]);
 
+  // Use roomState if available, otherwise fall back to initialRoom
+  const room = roomState || initialRoom;
+  
   if (!room) return null;
 
   return (
