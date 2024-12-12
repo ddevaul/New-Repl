@@ -32,6 +32,7 @@ type AuthFormValues = z.infer<typeof authSchema>;
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -46,38 +47,46 @@ export default function AuthForm() {
 
   const onSubmit = async (data: AuthFormValues) => {
     try {
+      setLoading(true);
+      console.log("Submitting form:", { ...data, password: "[REDACTED]" });
+      
       const response = await fetch(`/api/auth/${isLogin ? 'login' : 'signup'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
+      const result = await response.json();
+      
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || `Failed to ${isLogin ? 'log in' : 'sign up'}`);
+        throw new Error(result.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`);
       }
 
-      const result = await response.json();
-
+      console.log("Auth success:", { ...result, token: "[REDACTED]" });
+      
       toast({
         title: "Success",
         description: isLogin ? "Successfully logged in!" : "Account created successfully!",
       });
 
-      // Store the token and user info
       localStorage.setItem('authToken', result.token);
-      // If user is admin, redirect to admin dashboard, otherwise to home
-      if (result.user.isAdmin) {
+      
+      if (result.user?.isAdmin) {
+        console.log("Admin user detected, redirecting to admin dashboard");
         setLocation("/admin");
       } else {
+        console.log("Regular user detected, redirecting to home");
         setLocation("/");
       }
     } catch (error: any) {
+      console.error("Auth error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -132,8 +141,8 @@ export default function AuthForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full">
-              {isLogin ? "Log In" : "Sign Up"}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Please wait..." : (isLogin ? "Log In" : "Sign Up")}
             </Button>
           </form>
         </Form>
@@ -143,6 +152,7 @@ export default function AuthForm() {
           variant="link"
           onClick={() => setIsLogin(!isLogin)}
           className="text-sm"
+          disabled={loading}
         >
           {isLogin ? "Need an account? Sign up" : "Already have an account? Log in"}
         </Button>
