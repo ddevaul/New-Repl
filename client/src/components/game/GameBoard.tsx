@@ -1,24 +1,41 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import Prompt from "./Prompt";
-import Guess from "./Guess";
-import GuessHistory from "./GuessHistory";
+import Prompt from "@/components/game/Prompt";
+import Guess from "@/components/game/Guess";
+import GuessHistory from "@/components/game/GuessHistory";
 import { useToast } from "@/hooks/use-toast";
+
+interface Player {
+  id: number;
+  name: string;
+  isDrawer: boolean;
+  score: number;
+}
+
+interface Room {
+  id: number;
+  code: string;
+  status: string;
+  currentRound: number;
+  players: Player[];
+}
+
+interface GameState {
+  word?: string;
+  attemptsLeft: number;
+  currentImage: string | null;
+  guessData: Array<{
+    playerId: number;
+    playerName: string;
+    guess: string;
+    isCorrect?: boolean;
+  }>;
+  error?: string;
+}
 
 interface GameBoardProps {
   socket: WebSocket | null;
-  room: {
-    id: number;
-    code: string;
-    status: string;
-    currentRound: number;
-    players: Array<{
-      id: number;
-      name: string;
-      isDrawer: boolean;
-      score: number;
-    }>;
-  };
+  room: Room;
 }
 
 export default function GameBoard({ socket, room }: GameBoardProps) {
@@ -37,7 +54,8 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           toast({
             title: "Error",
             description: data.error,
-            variant: "destructive"
+            variant: "destructive",
+            duration: 4000
           });
           return;
         }
@@ -46,8 +64,11 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
         if (data.type === 'roundComplete') {
           toast({
             title: "Round Complete!",
-            description: data.message,
-            variant: "default"
+            description: `${data.message} ${data.pointsEarned ? 
+              `Drawer earned ${data.pointsEarned.drawer} points, Guesser earned ${data.pointsEarned.guesser} points!` : 
+              ''}`,
+            variant: "default",
+            duration: 5000
           });
           return;
         }
@@ -57,19 +78,25 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           toast({
             title: data.joined ? "Player Joined" : "Player Left",
             description: `${data.playerName} has ${data.joined ? 'joined' : 'left'} the game`,
-            variant: "default"
+            variant: data.joined ? "default" : "destructive",
+            duration: 4000
           });
           return;
         }
 
         // Update game state
-        setGameState(data);
+        setGameState((prevState: GameState | null) => ({
+          ...prevState,
+          ...data,
+          guessData: data.guessData || prevState?.guessData || []
+        }));
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
         toast({
           title: "Error",
           description: "Something went wrong. Please try again.",
-          variant: "destructive"
+          variant: "destructive",
+          duration: 4000
         });
       }
     };
@@ -79,7 +106,7 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
     return () => {
       socket.removeEventListener("message", handleMessage);
     };
-  }, [socket]);
+  }, [socket, toast]);
 
   if (!gameState) {
     return (
@@ -91,10 +118,9 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
     );
   }
 
-  const currentPlayer = room.players.find(player => 
-    room.players?.some(p => p.id === player.id)
-  );
-  const isDrawer = currentPlayer?.isDrawer ?? false;
+  // Find the current player based on their role
+  const currentPlayer = room.players.find(player => player.isDrawer);
+  const isDrawer = !!currentPlayer?.isDrawer;
 
   return (
     <Card className="p-8">

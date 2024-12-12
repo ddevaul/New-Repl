@@ -159,13 +159,19 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         isCorrect: guess.toLowerCase() === round.word.toLowerCase()
       };
 
+      const currentGuessData = round.guessData ? JSON.parse(round.guessData) : [];
+      const updatedGuessData = [...currentGuessData, formattedGuess];
+
       await db.update(rounds)
         .set({
           guesses: [...(round.guesses || []), guess],
-          guessData: JSON.stringify([...(JSON.parse(round.guessData || '[]')), formattedGuess]),
+          guessData: JSON.stringify(updatedGuessData),
           isCompleted: formattedGuess.isCorrect
         })
         .where(eq(rounds.id, round.id));
+
+      // Immediately broadcast the updated game state to all players
+      await updateGameState();
 
       if (formattedGuess.isCorrect) {
         // Update score for the guesser
@@ -234,8 +240,26 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
     }
   });
 
-  ws.on("close", () => {
-    // Cleanup
+  ws.on("close", async () => {
+    try {
+      const room = await db.query.rooms.findFirst({
+        where: eq(rooms.code, roomCode),
+        with: {
+          players: true
+        }
+      });
+
+      if (room) {
+        // Notify remaining players about disconnection
+        ws.send(JSON.stringify({
+          type: 'playerUpdate',
+          joined: false,
+          playerName: room.players[room.players.length - 1]?.name
+        }));
+      }
+    } catch (error) {
+      console.error('Error handling WebSocket close:', error);
+    }
   });
 
   // Initialize game state
