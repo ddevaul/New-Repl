@@ -62,14 +62,14 @@ export function registerRoutes(app: Express): Server {
     const newPlayer = {
       id: nextPlayerId++,
       name: playerName,
-      isDrawer: false,
+      isDrawer: false, // Second player is always the guesser
       score: 0
     };
 
     // Store the new player in the room
     room.players.push(newPlayer);
 
-    console.log(`Player ${playerName} (ID: ${newPlayer.id}) joined room ${code}`);
+    console.log(`Player ${playerName} (ID: ${newPlayer.id}) joined room ${code} as guesser`);
 
     // Return both the room code and the player's ID so we can identify them
     res.json({ 

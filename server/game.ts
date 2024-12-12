@@ -81,6 +81,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
         const currentPlayer = room.players.find(p => p.id === pid);
         if (!currentPlayer) return;
 
+        // Create a state object specific to this player's role
         const state = {
           ...room,
           attemptsLeft: 3 - room.drawerPrompts.length,
@@ -92,11 +93,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           }))
         };
 
-        // Only send word to the drawer
+        // Only the drawer should see the word
         if (!currentPlayer.isDrawer) {
           delete state.word;
         }
 
+        console.log(`Sending game state to ${currentPlayer.name} (${currentPlayer.isDrawer ? 'drawer' : 'guesser'})`);
         client.send(JSON.stringify(state));
       }
     });
