@@ -35,6 +35,16 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           return;
         }
 
+        // Handle round completion
+        if (data.type === 'roundComplete') {
+          toast({
+            title: "Round Complete!",
+            description: data.message,
+            variant: "default"
+          });
+          return;
+        }
+
         // Update game state
         setGameState(data);
       } catch (error) {

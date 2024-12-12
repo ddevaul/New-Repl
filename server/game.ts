@@ -133,6 +133,29 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         .where(eq(rounds.id, round.id));
 
       if (guess.toLowerCase() === round.word.toLowerCase()) {
+        // Update score for the guesser
+        const guessingPlayer = gameState.players.find((p: any) => !p.isDrawer);
+        if (guessingPlayer) {
+          const pointsEarned = 10;
+          await db.update(players)
+            .set({ 
+              score: guessingPlayer.score + pointsEarned,
+              isDrawer: !guessingPlayer.isDrawer // Swap roles
+            })
+            .where(eq(players.id, guessingPlayer.id));
+
+          // Also give points to the drawer
+          const drawingPlayer = gameState.players.find((p: any) => p.isDrawer);
+          if (drawingPlayer) {
+            await db.update(players)
+              .set({ 
+                score: drawingPlayer.score + 5,
+                isDrawer: !drawingPlayer.isDrawer // Swap roles
+              })
+              .where(eq(players.id, drawingPlayer.id));
+          }
+        }
+
         // Start new round
         const newWord = WORDS[Math.floor(Math.random() * WORDS.length)];
         await db.insert(rounds).values({
@@ -144,12 +167,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
           .set({ currentRound: gameState.currentRound + 1 })
           .where(eq(rooms.id, gameState.roomId));
 
-        // Swap roles
-        await Promise.all(gameState.players.map((player: any) =>
-          db.update(players)
-            .set({ isDrawer: !player.isDrawer })
-            .where(eq(players.id, player.id))
-        ));
+        // Send a success message to the client
+        ws.send(JSON.stringify({
+          type: 'roundComplete',
+          message: 'Correct guess! Starting new round...',
+          pointsEarned: { guesser: 10, drawer: 5 }
+        }));
       }
 
       await updateGameState();
