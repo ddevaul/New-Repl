@@ -30,24 +30,33 @@ export type Room = {
 };
 
 // Keep track of WebSocket connections for each room
-const roomConnections = new Map<string, Set<WebSocket>>();
+const roomConnections = new Map<string, Map<number, WebSocket>>();
 
 // Store active game rooms
 export const rooms = new Map<string, Room>();
 
-export function setupGameHandlers(ws: WebSocket, roomCode: string) {
+export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) {
   const room = rooms.get(roomCode);
   if (!room) {
     ws.send(JSON.stringify({ error: 'Room not found' }));
     return;
   }
 
+  // Extract playerId from URL query parameters
+  const playerIdMatch = url.match(/playerId=(\d+)/);
+  const playerId = playerIdMatch ? parseInt(playerIdMatch[1]) : null;
+
+  if (!playerId) {
+    ws.send(JSON.stringify({ error: 'Player ID not found' }));
+    return;
+  }
+
   // Initialize connections set for the room if it doesn't exist
   if (!roomConnections.has(roomCode)) {
-    roomConnections.set(roomCode, new Set());
+    roomConnections.set(roomCode, new Map());
   }
   const connections = roomConnections.get(roomCode)!;
-  connections.add(ws);
+  connections.set(playerId, ws);
 
   // Broadcast game state to all connected clients in the room
   function broadcastGameState() {
@@ -190,7 +199,15 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string) {
   // Cleanup on disconnect
   ws.on("close", () => {
     console.log(`Client disconnected from room ${roomCode}`);
-    connections.delete(ws);
+    
+    // Find and remove the connection associated with this player
+    const entries = Array.from(connections.entries());
+    for (const [pid, conn] of entries) {
+      if (conn === ws) {
+        connections.delete(pid);
+        break;
+      }
+    }
     
     // If no more connections in the room, clean up
     if (connections.size === 0) {

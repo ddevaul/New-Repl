@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,11 @@ export default function Room() {
   const { toast } = useToast();
   const code = params?.code?.toUpperCase();
 
+  const [playerId] = useState<number>(() => {
+    const stored = sessionStorage.getItem('playerId');
+    return stored ? parseInt(stored) : 0;
+  });
+
   const { data: room, error } = useQuery({
     queryKey: ["/api/rooms", code],
     queryFn: async () => {
@@ -22,7 +27,7 @@ export default function Room() {
     enabled: !!code
   });
 
-  const socket = useWebSocket(code);
+  const socket = useWebSocket(code, playerId);
 
   useEffect(() => {
     if (error) {
@@ -42,26 +47,20 @@ export default function Room() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold">Room Code: {code}</h1>
-          <div className="flex gap-4">
-            <div className="flex flex-col gap-2">
-              {room.players.map((player: any) => (
-                <div
-                  key={player.id}
-                  className="flex items-center gap-2 px-4 py-2 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg"
-                >
-                  <div className={`w-3 h-3 rounded-full ${player.isDrawer ? 'bg-primary' : 'bg-secondary'}`} />
-                  <span className="font-medium">{player.name}</span>
-                  <span className="text-sm text-muted-foreground ml-auto">
-                    {player.score} points
+          <div className="flex gap-2">
+            {room.players.map((player: { id: number; name: string; isDrawer: boolean }) => (
+              <div
+                key={player.id}
+                className="px-4 py-2 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg flex items-center gap-2"
+              >
+                <span className="font-medium">{player.name}</span>
+                {player.isDrawer && (
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                    Drawing
                   </span>
-                  {player.isDrawer && (
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                      Drawing
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
         <GameBoard socket={socket} room={room} />

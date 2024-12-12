@@ -28,6 +28,7 @@ export default function Home() {
       return res.json();
     },
     onSuccess: (data) => {
+      sessionStorage.setItem('playerId', data.playerId.toString());
       setLocation(`/room/${data.code}`);
     },
     onError: (error: Error) => {

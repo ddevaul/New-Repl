@@ -56,14 +56,23 @@ export function registerRoutes(app: Express): Server {
       return res.status(400).json({ message: "Room is full" });
     }
 
-    room.players.push({
+    const newPlayer = {
       id: nextPlayerId++,
       name: playerName,
       isDrawer: false,
       score: 0
-    });
+    };
 
-    res.json({ code: room.code });
+    // Store the new player in the room
+    room.players.push(newPlayer);
+
+    console.log(`Player ${playerName} (ID: ${newPlayer.id}) joined room ${code}`);
+
+    // Return both the room code and the player's ID so we can identify them
+    res.json({ 
+      code: room.code,
+      playerId: newPlayer.id
+    });
   });
 
   // Get room
@@ -80,15 +89,16 @@ export function registerRoutes(app: Express): Server {
 
   // WebSocket handling
   httpServer.on("upgrade", (request, socket, head) => {
-    if (!request.url) return socket.destroy();
+    const url = request.url;
+    if (!url) return socket.destroy();
 
-    const match = request.url.match(/^\/ws\/room\/([A-Z0-9]{6})$/);
+    const match = url.match(/^\/ws\/room\/([A-Z0-9]{6})$/);
     if (!match) return socket.destroy();
 
     const roomCode = match[1];
 
     wss.handleUpgrade(request, socket, head, (ws) => {
-      setupGameHandlers(ws, roomCode);
+      setupGameHandlers(ws, roomCode, url);
     });
   });
 
