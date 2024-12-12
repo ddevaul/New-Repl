@@ -20,6 +20,7 @@ interface User {
   gamesPlayed: number;
   gamesLimit: number;
   createdAt: string;
+  isAdmin: boolean;
 }
 
 export default function AdminDashboard() {
@@ -110,6 +111,7 @@ export default function AdminDashboard() {
               <TableHead>Email</TableHead>
               <TableHead>Games Played</TableHead>
               <TableHead>Games Limit</TableHead>
+              <TableHead>Is Admin</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -120,6 +122,8 @@ export default function AdminDashboard() {
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.gamesPlayed}</TableCell>
                 <TableCell>{user.gamesLimit}</TableCell>
+                <TableCell>{user.isAdmin ? "Yes" : "No"}</TableCell>
+                <TableCell>{user.isAdmin ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Input
