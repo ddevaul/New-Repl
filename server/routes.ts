@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { signup, login, authMiddleware, checkGameLimit } from "./auth.js";
+import { isAdmin, getAllUsers, updateUserGamesLimit } from "./admin.js";
 import { 
   rooms, 
   type Room, 
@@ -19,6 +20,10 @@ export function registerRoutes(app: Express): Server {
   // Auth routes
   app.post("/api/auth/signup", signup);
   app.post("/api/auth/login", login);
+
+  // Admin routes
+  app.get("/api/admin/users", authMiddleware, isAdmin, getAllUsers);
+  app.put("/api/admin/users/:userId/games-limit", authMiddleware, isAdmin, updateUserGamesLimit);
 
   // Get leaderboard
   app.get("/api/leaderboard", async (req, res) => {

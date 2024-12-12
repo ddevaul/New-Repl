@@ -8,7 +8,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name").notNull(),
   gamesPlayed: integer("games_played").default(0),
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  isAdmin: boolean("is_admin").default(false),
+  gamesLimit: integer("games_limit").default(3)
 });
 
 export const rooms = pgTable("rooms", {
