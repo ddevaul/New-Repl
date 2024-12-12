@@ -114,6 +114,22 @@ type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
 
 type ToastActionElement = React.ReactElement<typeof ToastAction>
 
+type ToastRootProps = React.ComponentPropsWithoutRef<typeof Toast>
+
+export function useToast() {
+  return {
+    toast: (props: ToastRootProps) => {
+      // Implementation will be added by the useToast hook
+    },
+    toasts: [] as ToastRootProps[],
+  }
+}
+
+export const toast = (props: ToastRootProps) => {
+  const { toast } = useToast()
+  toast(props)
+}
+
 export {
   type ToastProps,
   type ToastActionElement,
