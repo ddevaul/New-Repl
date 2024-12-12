@@ -46,11 +46,23 @@ export default function AuthForm() {
   });
 
   async function onSubmit(values: AuthFormValues) {
+    console.log("Starting form submission with values:", { ...values, password: '***' });
+    
+    if (!values.email || !values.password) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
-      console.log("Form submission started");
+      const endpoint = `/api/auth/${isLogin ? 'login' : 'signup'}`;
+      console.log(`Submitting to endpoint: ${endpoint}`);
 
-      const response = await fetch(`/api/auth/${isLogin ? 'login' : 'signup'}`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json'
@@ -61,39 +73,55 @@ export default function AuthForm() {
         } : values),
       });
 
-      console.log("Response received:", response.status);
+      console.log("Response status:", response.status);
       
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+        console.log("Response parsed successfully:", { ...result, token: '***' });
+      } catch (parseError) {
+        console.error("Failed to parse response:", parseError);
+        throw new Error("Server response was not in the expected format");
+      }
       
       if (!response.ok) {
+        console.error("Server returned error:", result);
         throw new Error(result.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`);
       }
 
-      console.log("Authentication successful");
+      if (!result.token) {
+        console.error("No token in response:", result);
+        throw new Error("Invalid server response: no authentication token");
+      }
+
+      console.log("Authentication successful, saving token");
+      localStorage.setItem('authToken', result.token);
       
       toast({
         title: "Success",
         description: isLogin ? "Successfully logged in!" : "Account created successfully!",
       });
-
-      localStorage.setItem('authToken', result.token);
       
+      console.log("Checking user role:", result.user);
       if (result.user?.isAdmin) {
-        console.log("Admin user detected, redirecting to admin dashboard");
+        console.log("Redirecting to admin dashboard");
         setLocation("/admin");
       } else {
-        console.log("Regular user detected, redirecting to home");
+        console.log("Redirecting to home");
         setLocation("/");
       }
     } catch (error: any) {
-      console.error("Auth error:", error);
+      console.error("Authentication error:", error);
       toast({
         title: "Error",
         description: error.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`,
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
+    } finally {
+      if (loading) {
+        setLoading(false);
+      }
     }
   }
 
@@ -106,7 +134,13 @@ export default function AuthForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              form.handleSubmit(onSubmit)(e);
+            }} 
+            className="space-y-4"
+          >
             {!isLogin && (
               <FormField
                 control={form.control}
