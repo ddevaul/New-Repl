@@ -141,7 +141,7 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
             />
           ) : (
             <div className="w-full max-w-[1024px] aspect-square rounded-lg bg-muted/50 backdrop-blur-sm border border-muted flex flex-col items-center justify-center p-8 space-y-4">
-              {!gameState.error && (
+              {!gameState.error && gameState.drawerPrompts?.length > 0 && (
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent shadow-lg"></div>
               )}
               <p className="text-lg text-center max-w-md">
@@ -149,6 +149,10 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
                   <span className="inline-flex items-center gap-2 text-destructive">
                     <span className="font-semibold">Error:</span>
                     {gameState.error}
+                  </span>
+                ) : gameState.drawerPrompts?.length === 0 ? (
+                  <span className="text-muted-foreground">
+                    Waiting for drawer to input a prompt...
                   </span>
                 ) : (
                   <span className="animate-pulse">Generating your masterpiece...</span>
