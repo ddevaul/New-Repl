@@ -47,7 +47,7 @@ export default function AuthForm() {
 
   async function onSubmit(values: AuthFormValues) {
     try {
-      console.log('Starting authentication process...');
+      console.log('Starting authentication process...', new Date().toISOString());
       
       if (!values.email || !values.password) {
         console.log('Missing required fields');
@@ -58,6 +58,8 @@ export default function AuthForm() {
         });
         return;
       }
+
+      console.log('Validation passed, proceeding with authentication');
       
       console.log('All required fields present, proceeding with authentication');
 
@@ -138,10 +140,13 @@ export default function AuthForm() {
       <CardContent>
         <Form {...form}>
           <form 
-            onSubmit={form.handleSubmit((data) => {
-              console.log('Form submitted with data:', { ...data, password: '***' });
-              onSubmit(data);
-            })}
+            onSubmit={(e) => {
+              e.preventDefault();
+              console.log('Form submit event captured');
+              const formData = form.getValues();
+              console.log('Form data:', { ...formData, password: '***' });
+              onSubmit(formData);
+            }} 
             className="space-y-4"
           >
             {!isLogin && (
