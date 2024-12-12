@@ -1,14 +1,43 @@
-import { WebSocket } from "ws";
 import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
 // Game state is managed in memory
 
-// Pre-defined list of words for the game
-export const WORDS = [
-  "elephant", "basketball", "sunshine", "guitar", "rainbow",
-  "butterfly", "spaceship", "waterfall", "dragon", "pizza",
-  "lighthouse", "unicorn", "volcano", "mermaid", "castle",
-  "robot", "astronaut", "wizard", "dinosaur", "pirate"
-];
+// Organized word lists by category
+export const WORD_LISTS = {
+  animals: [
+    "elephant", "penguin", "giraffe", "dolphin", "kangaroo",
+    "butterfly", "octopus", "panda", "tiger", "koala",
+    "dragon", "unicorn", "dinosaur", "whale", "lion"
+  ],
+  objects: [
+    "guitar", "basketball", "spaceship", "lighthouse", "pizza",
+    "camera", "umbrella", "telescope", "compass", "backpack",
+    "laptop", "bicycle", "helicopter", "submarine", "rocket"
+  ],
+  nature: [
+    "rainbow", "sunshine", "waterfall", "volcano", "mountain",
+    "forest", "beach", "desert", "glacier", "canyon",
+    "island", "tornado", "aurora", "jungle", "oasis"
+  ],
+  characters: [
+    "wizard", "astronaut", "pirate", "mermaid", "ninja",
+    "superhero", "viking", "robot", "alien", "knight",
+    "fairy", "cowboy", "scientist", "chef", "explorer"
+  ]
+};
+
+// Function to get a random word from all categories or a specific category
+export function getRandomWord(category?: keyof typeof WORD_LISTS): string {
+  if (category && category in WORD_LISTS) {
+    const words = WORD_LISTS[category];
+    return words[Math.floor(Math.random() * words.length)];
+  }
+  
+  // If no category specified or invalid category, pick from all categories
+  const allCategories = Object.keys(WORD_LISTS) as (keyof typeof WORD_LISTS)[];
+  const randomCategory = allCategories[Math.floor(Math.random() * allCategories.length)];
+  const words = WORD_LISTS[randomCategory];
+  return words[Math.floor(Math.random() * words.length)];
+}
 
 export type Player = {
   id: number;
@@ -148,7 +177,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
               // Reset for next round
               room.currentRound += 1;
-              room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+              room.word = getRandomWord(); // Use new getRandomWord function
               room.drawerPrompts = [];
               room.guesses = [];
               room.currentImage = null;
@@ -255,7 +284,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
               // Reset for next round
               room.currentRound += 1;
-              room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+              room.word = getRandomWord(); // Use new getRandomWord function
               room.drawerPrompts = [];
               room.guesses = [];
               room.currentImage = null;
@@ -284,7 +313,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
   // Initialize game state and send it to the client
   if (!room.word) {
-    room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
+    room.word = getRandomWord(); // Use new getRandomWord function
   }
 
   // Send initial game state

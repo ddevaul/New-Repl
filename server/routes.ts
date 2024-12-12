@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
-import { rooms, type Room, setupGameHandlers, WORDS } from "./game.js";
+import { rooms, type Room, setupGameHandlers, getRandomWord } from "./game.js";
 import { db } from "../db/index.js";
 import { highScores } from "../db/schema.js";
 import { desc, sql } from "drizzle-orm";
@@ -45,7 +45,7 @@ export function registerRoutes(app: Express): Server {
         isDrawer: true,
         score: 0
       }],
-      word: WORDS[Math.floor(Math.random() * WORDS.length)],
+      word: getRandomWord(),
       drawerPrompts: [],
       guesses: [],
       currentImage: null,
