@@ -1,10 +1,18 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
-import { rooms, type Room, setupGameHandlers, getRandomWord } from "./game.js";
+import { 
+  rooms, 
+  type Room, 
+  setupGameHandlers, 
+  getRandomWord,
+  getCategories,
+  addCategory,
+  addWordToCategory
+} from "./game.js";
 import { db } from "../db/index.js";
 import { highScores } from "../db/schema.js";
-import { desc, sql } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
 let nextRoomId = 1;
 let nextPlayerId = 1;
@@ -23,8 +31,48 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to fetch leaderboard" });
     }
   });
-  const httpServer = createServer(app);
-  const wss = new WebSocketServer({ noServer: true });
+
+  // Get word categories
+  app.get("/api/categories", (req, res) => {
+    try {
+      const categories = getCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  // Add new category
+  app.post("/api/categories", (req, res) => {
+    const { categoryId, name, description } = req.body;
+    
+    if (!categoryId || !name) {
+      return res.status(400).json({ message: "Category ID and name are required" });
+    }
+
+    if (addCategory(categoryId, name, description)) {
+      res.json({ message: "Category added successfully" });
+    } else {
+      res.status(400).json({ message: "Failed to add category" });
+    }
+  });
+
+  // Add word to category
+  app.post("/api/categories/:categoryId/words", (req, res) => {
+    const { categoryId } = req.params;
+    const { word } = req.body;
+
+    if (!word) {
+      return res.status(400).json({ message: "Word is required" });
+    }
+
+    if (addWordToCategory(categoryId, word)) {
+      res.json({ message: "Word added successfully" });
+    } else {
+      res.status(400).json({ message: "Failed to add word" });
+    }
+  });
 
   // Create room
   app.post("/api/rooms", (req, res) => {
@@ -56,7 +104,7 @@ export function registerRoutes(app: Express): Server {
     console.log(`Created room ${code} with word "${room.word}"`);
     res.json({ 
       code: room.code,
-      playerId: room.players[0].id // Return the creator's player ID
+      playerId: room.players[0].id
     });
   });
 
@@ -78,14 +126,12 @@ export function registerRoutes(app: Express): Server {
     const newPlayer = {
       id: nextPlayerId++,
       name: playerName,
-      isDrawer: false, // Second player is always the guesser
+      isDrawer: false,
       score: 0
     };
 
-    // Store the new player in the room
     room.players.push(newPlayer);
 
-    // Start the game if we have 2 players
     if (room.players.length === 2) {
       room.status = 'playing';
       console.log(`Game starting in room ${code} with word "${room.word}"`);
@@ -93,7 +139,6 @@ export function registerRoutes(app: Express): Server {
 
     console.log(`Player ${playerName} (ID: ${newPlayer.id}) joined room ${code} as guesser`);
 
-    // Return both the room code and the player's ID so we can identify them
     res.json({ 
       code: room.code,
       playerId: newPlayer.id
@@ -111,6 +156,10 @@ export function registerRoutes(app: Express): Server {
 
     res.json(room);
   });
+
+  // Create HTTP server
+  const httpServer = createServer(app);
+  const wss = new WebSocketServer({ noServer: true });
 
   // WebSocket handling
   httpServer.on("upgrade", (request, socket, head) => {
