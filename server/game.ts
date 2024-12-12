@@ -39,6 +39,8 @@ export type Room = {
   guesses: Array<{ text: string; player: string; timestamp: string }>;
   currentImage: string | null;
   attemptsLeft: number;
+  waitingForGuess: boolean;
+  waitingForPrompt: boolean;
 };
 
 // Keep track of WebSocket connections for each room
@@ -102,7 +104,9 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             name: p.name,
             isDrawer: p.isDrawer,
             score: p.score
-          }))
+          })),
+          waitingForGuess: false,
+          waitingForPrompt: false
         };
 
         // Only the drawer should see the word
@@ -199,6 +203,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               room.guesses = [];
               room.currentImage = null;
               room.attemptsLeft = 3;
+              room.waitingForGuess = false;
+              room.waitingForPrompt = false;
             }
 
             // Notify all clients about round end
@@ -219,17 +225,22 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           
           // Send loading state
           room.currentImage = null;
-          broadcastGameState();
+          room.waitingForGuess = true; // Set waiting for guess
+          room.waitingForPrompt = true; // Set waiting for prompt
+          broadcastGameState(); // Broadcast loading state to clients
 
           // Generate image
           try {
             console.log('Attempting to generate image for prompt:', message.prompt);
             room.currentImage = null; // Set to null to show loading state
+            room.waitingForPrompt = true;
             broadcastGameState(); // Broadcast loading state to clients
 
             const imageUrl = await generateImage(message.prompt);
             room.currentImage = imageUrl;
             room.drawerPrompts.push(message.prompt);
+            room.waitingForPrompt = false;
+            room.waitingForGuess = true;
             
             if (imageUrl === PLACEHOLDER_IMAGE) {
               console.warn('Using placeholder image due to generation failure');
@@ -262,12 +273,25 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
           console.log('Processing guess:', message.guess);
 
+          // Only accept guess if we're waiting for one
+          if (!room.waitingForGuess) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Please wait for a new image before guessing'
+            }));
+            break;
+          }
+
           // Record the guess
           room.guesses.push({
             text: message.guess,
             player: guesser.name,
             timestamp: new Date().toISOString()
           });
+          
+          // Reset waiting states
+          room.waitingForGuess = false;
+          room.waitingForPrompt = false;
 
           // Check if guess is correct
           if (message.guess.toLowerCase() === room.word?.toLowerCase()) {
@@ -306,6 +330,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               room.guesses = [];
               room.currentImage = null;
               room.attemptsLeft = 3;
+              room.waitingForGuess = false;
+              room.waitingForPrompt = false;
             }
 
             // Notify all clients
@@ -318,7 +344,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               }
             });
           }
-
+          room.waitingForPrompt = false; // Reset waiting for prompt after guess
+          room.waitingForGuess = false; // Reset waiting for guess after guess
           broadcastGameState();
           break;
       }

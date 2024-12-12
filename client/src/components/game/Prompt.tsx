@@ -107,13 +107,14 @@ export default function Prompt({ socket, word, attemptsLeft }: PromptProps) {
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe how to visualize this word..."
           className="w-full text-lg py-6"
+          disabled={attemptsLeft === 0 || socket.readyState !== WebSocket.OPEN || word === undefined}
         />
         <Button 
           type="submit" 
-          disabled={attemptsLeft === 0}
+          disabled={attemptsLeft === 0 || socket.readyState !== WebSocket.OPEN || !prompt.trim() || word === undefined}
           className="w-full py-6 text-lg font-semibold"
         >
-          Generate Image
+          {attemptsLeft === 0 ? "No attempts left" : word ? "Generate Image" : "Choose a word first"}
         </Button>
       </form>
     </div>

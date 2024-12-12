@@ -6,10 +6,12 @@ import { useToast } from "@/hooks/use-toast";
 interface GuessProps {
   socket: WebSocket;
   attemptsLeft: number;
+  waitingForPrompt: boolean;
 }
 
-export default function Guess({ socket, attemptsLeft }: GuessProps) {
+export default function Guess({ socket, attemptsLeft, waitingForPrompt }: GuessProps) {
   const [guess, setGuess] = useState("");
+  const [hasGuessed, setHasGuessed] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -28,6 +30,7 @@ export default function Guess({ socket, attemptsLeft }: GuessProps) {
       guess: guess.trim()
     }));
     setGuess("");
+    setHasGuessed(true);
   };
 
   return (
@@ -55,13 +58,16 @@ export default function Guess({ socket, attemptsLeft }: GuessProps) {
           onChange={(e) => setGuess(e.target.value)}
           placeholder="Type your guess here..."
           className="w-full text-lg py-6"
+          disabled={hasGuessed || waitingForPrompt || attemptsLeft === 0}
         />
         <Button 
           type="submit" 
-          disabled={attemptsLeft === 0}
+          disabled={hasGuessed || waitingForPrompt || attemptsLeft === 0 || !guess.trim()}
           className="w-full py-6 text-lg font-semibold"
         >
-          Submit Guess
+          {hasGuessed ? "Waiting for next image..." : 
+           waitingForPrompt ? "Waiting for drawer..." :
+           attemptsLeft === 0 ? "No attempts left" : "Submit Guess"}
         </Button>
       </form>
     </div>

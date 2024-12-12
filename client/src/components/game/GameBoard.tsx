@@ -34,6 +34,8 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
       score: number;
     }>;
     currentRound: number;
+    waitingForGuess: boolean;
+    waitingForPrompt: boolean;
   } | null>(null);
   const { toast } = useToast();
 
@@ -186,6 +188,7 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
           <Guess
             socket={socket!}
             attemptsLeft={gameState.attemptsLeft}
+            waitingForPrompt={gameState.waitingForPrompt}
           />
         )}
       </div>
