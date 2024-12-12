@@ -10,11 +10,15 @@ export function useWebSocket(roomCode: string | undefined, playerId: number) {
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws/room/${roomCode}?playerId=${playerId}`);
 
     ws.onopen = () => {
-      console.log('WebSocket Connected');
+      console.log('WebSocket Connected for player:', playerId, 'in room:', roomCode);
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket Error:', error);
+      console.error('WebSocket Error:', error, 'for player:', playerId, 'in room:', roomCode);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket Closed for player:', playerId, 'in room:', roomCode);
     };
 
     setSocket(ws);

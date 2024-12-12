@@ -13,7 +13,13 @@ export default function Room() {
 
   const [playerId] = useState<number>(() => {
     const stored = sessionStorage.getItem('playerId');
-    return stored ? parseInt(stored) : 0;
+    if (!stored) {
+      console.error('No player ID found in session storage');
+      return 0;
+    }
+    const id = parseInt(stored);
+    console.log('Retrieved player ID from session storage:', id);
+    return id;
   });
 
   const { data: room, error } = useQuery({

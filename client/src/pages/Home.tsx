@@ -28,7 +28,10 @@ export default function Home() {
       return res.json();
     },
     onSuccess: (data) => {
-      sessionStorage.setItem('playerId', data.playerId.toString());
+      if (data.playerId) {
+        console.log('Saving player ID:', data.playerId);
+        sessionStorage.setItem('playerId', data.playerId.toString());
+      }
       setLocation(`/room/${data.code}`);
     },
     onError: (error: Error) => {
@@ -56,8 +59,12 @@ export default function Home() {
       }
       return res.json();
     },
-    onSuccess: (_, code) => {
-      setLocation(`/room/${code}`);
+    onSuccess: (data) => {
+      if (data.playerId) {
+        console.log('Saving player ID:', data.playerId);
+        sessionStorage.setItem('playerId', data.playerId.toString());
+      }
+      setLocation(`/room/${data.code}`);
     },
     onError: (error: Error) => {
       toast({

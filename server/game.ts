@@ -61,12 +61,28 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
   // Broadcast game state to all connected clients in the room
   function broadcastGameState() {
     if (!room) return;
-    const state = {
-      ...room,
-      attemptsLeft: 3 - room.drawerPrompts.length
-    };
-    connections.forEach(client => {
+    
+    connections.forEach((client, pid) => {
       if (client.readyState === WebSocket.OPEN) {
+        const player = room.players.find(p => p.id === pid);
+        if (!player) return;
+
+        const state = {
+          ...room,
+          attemptsLeft: 3 - room.drawerPrompts.length,
+          players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            isDrawer: p.isDrawer,
+            score: p.score
+          }))
+        };
+
+        // Only send word to the drawer
+        if (!player.isDrawer) {
+          delete state.word;
+        }
+
         client.send(JSON.stringify(state));
       }
     });
@@ -194,20 +210,25 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
   if (!room.word) {
     room.word = WORDS[Math.floor(Math.random() * WORDS.length)];
   }
+
+  // Verify player is in the room and has correct role
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) {
+    console.error(`Player ${playerId} not found in room ${roomCode}`);
+    ws.send(JSON.stringify({ error: 'Player not found in room' }));
+    ws.close();
+    return;
+  }
+
+  console.log(`Player ${player.name} (${player.id}) connected as ${player.isDrawer ? 'drawer' : 'guesser'}`);
   broadcastGameState();
 
   // Cleanup on disconnect
   ws.on("close", () => {
-    console.log(`Client disconnected from room ${roomCode}`);
+    console.log(`Player ${player.name} (${player.id}) disconnected from room ${roomCode}`);
     
     // Find and remove the connection associated with this player
-    const entries = Array.from(connections.entries());
-    for (const [pid, conn] of entries) {
-      if (conn === ws) {
-        connections.delete(pid);
-        break;
-      }
-    }
+    connections.delete(playerId);
     
     // If no more connections in the room, clean up
     if (connections.size === 0) {
