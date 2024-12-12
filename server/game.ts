@@ -94,14 +94,16 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
       ws.send(JSON.stringify({
         ...gameState,
         currentImage: null,
-        attemptsLeft: gameState.attemptsLeft - 1
+        attemptsLeft: gameState.attemptsLeft - 1,
+        error: null
       }));
 
       // Then send the actual image once generated
       gameState = {
         ...gameState,
         currentImage: imageUrl,
-        attemptsLeft: gameState.attemptsLeft - 1
+        attemptsLeft: gameState.attemptsLeft - 1,
+        error: imageUrl === PLACEHOLDER_IMAGE ? "Image generation failed. Please try again once API key is configured." : null
       };
 
       // Send final state with image to client

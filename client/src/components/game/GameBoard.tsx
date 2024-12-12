@@ -105,9 +105,17 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
               className="w-[512px] h-[512px] rounded-lg object-cover"
             />
           ) : (
-            <div className="w-[512px] h-[512px] rounded-lg bg-muted flex items-center justify-center">
-              <p className="text-muted-foreground">
-                Generating image...
+            <div className="w-[512px] h-[512px] rounded-lg bg-muted flex flex-col items-center justify-center p-4 space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+              <p className="text-muted-foreground text-center">
+                {gameState.error ? (
+                  <>
+                    <span className="text-destructive font-medium">Error: </span>
+                    {gameState.error}
+                  </>
+                ) : (
+                  "Generating image..."
+                )}
               </p>
             </div>
           )}
