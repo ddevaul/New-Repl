@@ -59,17 +59,22 @@ export default function Room() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {room.players.map((player) => (
+            {room.players.map((player: {id: number; name: string; isDrawer: boolean; score: number}) => (
               <div
                 key={player.id}
-                className={`px-4 py-2 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg flex items-center gap-2 ${
+                className={`px-4 py-2 bg-muted/50 backdrop-blur-sm border border-muted rounded-lg flex items-center gap-4 ${
                   player.id === playerId ? 'ring-2 ring-primary' : ''
                 }`}
               >
                 <span className="font-medium">{player.name}</span>
-                <span className={`text-xs ${player.isDrawer ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'} px-2 py-1 rounded-full`}>
-                  {player.isDrawer ? 'Drawing' : 'Guessing'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs ${player.isDrawer ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'} px-2 py-1 rounded-full`}>
+                    {player.isDrawer ? 'Drawing' : 'Guessing'}
+                  </span>
+                  <span className="text-xs bg-muted/80 px-2 py-1 rounded-full">
+                    Score: {player.score}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
