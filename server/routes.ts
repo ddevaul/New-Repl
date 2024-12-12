@@ -85,6 +85,12 @@ export function registerRoutes(app: Express): Server {
     // Store the new player in the room
     room.players.push(newPlayer);
 
+    // Start the game if we have 2 players
+    if (room.players.length === 2) {
+      room.status = 'playing';
+      console.log(`Game starting in room ${code} with word "${room.word}"`);
+    }
+
     console.log(`Player ${playerName} (ID: ${newPlayer.id}) joined room ${code} as guesser`);
 
     // Return both the room code and the player's ID so we can identify them

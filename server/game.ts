@@ -317,8 +317,25 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
     room.word = getRandomWord();
   }
 
-  // Send initial game state
+  // Log the current state of the room
+  console.log('Room state on WebSocket connection:', {
+    roomCode,
+    playerId,
+    playerName: connectingPlayer.name,
+    totalPlayers: room.players.length,
+    allPlayerIds: room.players.map(p => p.id),
+    status: room.status
+  });
+
+  // Send initial game state to all clients
   broadcastGameState();
+
+  // If this is the second player joining, start the game
+  if (room.players.length === 2 && room.status === 'waiting') {
+    room.status = 'playing';
+    console.log(`Game starting in room ${roomCode} with word "${room.word}"`);
+    broadcastGameState();
+  }
 
   // Cleanup on disconnect
   ws.on("close", () => {
