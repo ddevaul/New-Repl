@@ -39,15 +39,11 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
 
   const updateGameState = async () => {
     try {
+      // First get the room with players
       const room = await db.query.rooms.findFirst({
         where: eq(rooms.code, roomCode),
         with: {
-          players: true,
-          rounds: {
-            where: eq(rounds.isCompleted, false),
-            limit: 1,
-            orderBy: [{ id: "desc" }]
-          }
+          players: true
         }
       });
 
@@ -56,6 +52,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
         ws.close();
         return;
       }
+
+      // Then get the latest active round
+      const latestRound = await db.query.rounds.findFirst({
+        where: eq(rounds.roomId, room.id),
+        orderBy: (rounds, { desc }) => [desc(rounds.id)]
+      });
 
       // Notify all players about new joins
       if (!gameState) {
@@ -67,28 +69,38 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, db: DrizzleCl
       }
 
       // Create initial round if none exists
-      if (!room.rounds || room.rounds.length === 0) {
+      if (!latestRound) {
         const word = WORDS[Math.floor(Math.random() * WORDS.length)];
-        await db.insert(rounds).values({
+        const [newRound] = await db.insert(rounds).values({
           roomId: room.id,
           word,
           drawerPrompts: [],
-          guesses: []
-        });
-        return updateGameState();
+          guesses: [],
+          guessData: '[]'
+        }).returning();
+        
+        gameState = {
+          roomId: room.id,
+          currentRound: room.currentRound,
+          players: room.players,
+          word: newRound.word,
+          attemptsLeft: 3,
+          currentImage: null,
+          guessData: []
+        };
+      } else {
+        gameState = {
+          roomId: room.id,
+          currentRound: room.currentRound,
+          players: room.players,
+          word: latestRound.word,
+          attemptsLeft: 3 - (latestRound.drawerPrompts?.length || 0),
+          currentImage: latestRound.drawerPrompts?.length 
+            ? await generateImage(latestRound.drawerPrompts[latestRound.drawerPrompts.length - 1])
+            : null,
+          guessData: latestRound.guessData ? JSON.parse(latestRound.guessData) : []
+        };
       }
-
-      gameState = {
-        roomId: room.id,
-        currentRound: room.currentRound,
-        players: room.players,
-        word: room.rounds[0]?.word,
-        attemptsLeft: 3 - (room.rounds[0]?.drawerPrompts?.length || 0),
-        currentImage: room.rounds[0]?.drawerPrompts?.length 
-          ? await generateImage(room.rounds[0].drawerPrompts[room.rounds[0].drawerPrompts.length - 1])
-          : null,
-        guessData: room.rounds[0]?.guessData ? JSON.parse(room.rounds[0].guessData) : []
-      };
 
       // Send game state to all connected clients
       broadcast(gameState);
