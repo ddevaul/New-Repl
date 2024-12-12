@@ -86,18 +86,18 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
   const isDrawer = currentPlayer?.isDrawer ?? false;
 
   return (
-    <Card className="p-6">
-      <div className="space-y-6">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">
+    <Card className="p-8">
+      <div className="space-y-8">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
             Round {gameState?.currentRound ?? 1}
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-lg text-muted-foreground">
             {isDrawer ? "You are the drawer" : "You are guessing"}
           </p>
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex justify-center w-full">
           {gameState.currentImage ? (
             <img
               src={gameState.currentImage}
@@ -105,16 +105,18 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
               className="w-full max-w-[1024px] aspect-square rounded-lg object-cover"
             />
           ) : (
-            <div className="w-full max-w-[1024px] aspect-square rounded-lg bg-muted flex flex-col items-center justify-center p-4 space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-              <p className="text-muted-foreground text-center">
+            <div className="w-full max-w-[1024px] aspect-square rounded-lg bg-muted/50 backdrop-blur-sm border border-muted flex flex-col items-center justify-center p-8 space-y-4">
+              {!gameState.error && (
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent shadow-lg"></div>
+              )}
+              <p className="text-lg text-center max-w-md">
                 {gameState.error ? (
-                  <>
-                    <span className="text-destructive font-medium">Error: </span>
+                  <span className="inline-flex items-center gap-2 text-destructive">
+                    <span className="font-semibold">Error:</span>
                     {gameState.error}
-                  </>
+                  </span>
                 ) : (
-                  "Generating image..."
+                  <span className="animate-pulse">Generating your masterpiece...</span>
                 )}
               </p>
             </div>
