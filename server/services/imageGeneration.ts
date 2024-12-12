@@ -5,14 +5,24 @@ const PLACEHOLDER_IMAGE = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWl
 export async function generateImage(prompt: string): Promise<string> {
   try {
     const apiKey = process.env.STABILITY_API_KEY;
+    
+    console.log('Debug - env variables:', {
+      hasApiKey: !!apiKey,
+      apiKeyLength: apiKey?.length,
+      apiKeyStart: apiKey?.substring(0, 5),
+      prompt
+    });
+
     if (!apiKey || apiKey.trim() === '') {
       console.warn('STABILITY_API_KEY is not set or empty - using placeholder image');
       return PLACEHOLDER_IMAGE;
     }
 
-    console.log('Generating image with prompt:', prompt);
-    console.log('API Key present:', !!apiKey);
-    console.log('API Key length:', apiKey?.length);
+    // Validate API key format
+    if (!apiKey.startsWith('sk-')) {
+      console.error('Invalid API key format - should start with sk-');
+      throw new Error('Invalid API key format - please check your Stability AI API key');
+    }
 
     const response = await fetch(
       `https://api.stability.ai/v1/generation/${config.stabilityApi.engineId}/text-to-image`,
@@ -34,19 +44,31 @@ export async function generateImage(prompt: string): Promise<string> {
     );
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => response.statusText);
+      let errorDetails;
+      try {
+        const errorText = await response.text();
+        errorDetails = JSON.parse(errorText);
+      } catch (e) {
+        errorDetails = { message: response.statusText };
+      }
+
       console.error('Stability AI API error:', {
         status: response.status,
         statusText: response.statusText,
-        error: errorText
+        errorDetails,
+        endpoint: `https://api.stability.ai/v1/generation/${config.stabilityApi.engineId}/text-to-image`,
+        requestHeaders: {
+          ...response.headers,
+          Authorization: 'Bearer [REDACTED]'
+        }
       });
 
       if (response.status === 401) {
-        throw new Error('Invalid API key - please check your Stability AI API key');
+        throw new Error(`Authentication failed - ${errorDetails.message}`);
       } else if (response.status === 429) {
         throw new Error('Rate limit exceeded - please try again later');
       } else {
-        throw new Error(`API error (${response.status}): ${errorText}`);
+        throw new Error(`API error (${response.status}): ${errorDetails.message || 'Unknown error'}`);
       }
     }
 
