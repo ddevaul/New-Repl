@@ -47,7 +47,10 @@ export default function AuthForm() {
 
   async function onSubmit(values: AuthFormValues) {
     try {
+      console.log('Starting authentication process...');
+      
       if (!values.email || !values.password) {
+        console.log('Missing required fields');
         toast({
           title: "Error",
           description: "Please fill in all required fields",
@@ -55,12 +58,15 @@ export default function AuthForm() {
         });
         return;
       }
+      
+      console.log('All required fields present, proceeding with authentication');
 
       setLoading(true);
 
       // Clear any existing auth token
       localStorage.removeItem('authToken');
 
+      console.log('Sending authentication request...');
       const response = await fetch(`/api/auth/${isLogin ? 'login' : 'signup'}`, {
         method: 'POST',
         headers: { 
@@ -72,10 +78,23 @@ export default function AuthForm() {
           ...(isLogin ? {} : { name: values.name }),
         }),
       });
+      
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+      });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+        console.log('Response data received:', { ...data, token: data.token ? '[PRESENT]' : '[MISSING]' });
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        throw new Error('Server response was not in the expected format');
+      }
 
       if (!response.ok) {
+        console.error('Server returned error:', data);
         throw new Error(data.message || `Failed to ${isLogin ? 'log in' : 'sign up'}`);
       }
 
@@ -119,10 +138,10 @@ export default function AuthForm() {
       <CardContent>
         <Form {...form}>
           <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit(onSubmit)(e);
-            }} 
+            onSubmit={form.handleSubmit((data) => {
+              console.log('Form submitted with data:', { ...data, password: '***' });
+              onSubmit(data);
+            })}
             className="space-y-4"
           >
             {!isLogin && (
