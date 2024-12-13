@@ -120,13 +120,22 @@ export async function generateImage(prompt: string): Promise<string> {
         throw new Error('Invalid artifact structure from Stability AI');
       }
 
+      // Process the base64 data to ensure it's a valid image
+      const base64Data = firstArtifact.base64;
+      if (!base64Data || typeof base64Data !== 'string') {
+        throw new Error('Invalid base64 data received from API');
+      }
+
       console.log('Successfully processed API response:', {
         artifactsCount: responseData.artifacts.length,
-        base64Length: firstArtifact.base64.length,
+        base64Length: base64Data.length,
         finishReason: firstArtifact.finishReason
       });
 
-      return `data:image/png;base64,${firstArtifact.base64}`;
+      // Return proper data URL format for PNG image
+      const imageUrl = `data:image/png;base64,${base64Data}`;
+      console.log('Generated image URL length:', imageUrl.length);
+      return imageUrl;
 
     } catch (fetchError: any) {
       console.error('Stability AI API Error:', {

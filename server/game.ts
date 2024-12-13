@@ -203,11 +203,20 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           const guesser = room.players.find(p => !p.isDrawer);
           if (!guesser) break;
 
+          const currentGuessIndex = room.guesses.length;
           room.guesses.push({
             text: message.guess,
             player: guesser.name,
             timestamp: new Date().toISOString()
           });
+
+          // Check if we need to show the next image for wrong guess
+          if (message.guess.toLowerCase() !== room.word.toLowerCase() && 
+              room.availableImages && 
+              room.availableImages.length > currentGuessIndex + 1) {
+            room.currentImage = room.availableImages[currentGuessIndex + 1];
+            console.log(`Showing next image ${currentGuessIndex + 1} for word:`, room.word);
+          }
 
           if (message.guess.toLowerCase() === room.word.toLowerCase()) {
             // Correct guess
