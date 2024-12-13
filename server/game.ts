@@ -202,10 +202,13 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
         case 'prompt':
           if (!room.word) break;
           
-          const drawer = room.players.find(p => p.isDrawer);
-          if (!drawer || drawer.id !== playerId) {
-            ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
-            break;
+          // In single player mode, AI generates the image automatically
+          if (room.gameMode !== 'single') {
+            const drawer = room.players.find(p => p.isDrawer);
+            if (!drawer || drawer.id !== playerId) {
+              ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
+              break;
+            }
           }
 
           try {
@@ -245,7 +248,6 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           });
 
           // Check if we need to show the next image for wrong guess
-          // Handle wrong guess - show next image if available
           if (message.guess.toLowerCase() !== room.word.toLowerCase()) {
             const nextImageIndex = room.guesses.length;
             if (room.availableImages && nextImageIndex < room.availableImages.length) {
@@ -368,38 +370,49 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
       room.word = getRandomWord();
       console.log('Starting new round with word:', room.word);
       
-      // Clear previous state
-      room.guesses = [];
-      room.currentImage = null;
-      room.error = undefined;
+      try {
+        // Clear previous state
+        room.guesses = [];
+        room.currentImage = null;
+        room.error = undefined;
+        
+        // Get or generate images for the word
+        console.log('Fetching images for word:', room.word);
+        const images = await getOrGenerateImages(room.word);
+        console.log(`Retrieved ${images.length} images for word:`, room.word);
+        
+        if (!images || images.length === 0) {
+          throw new Error('No images available for the word');
+        }
+        
+        room.availableImages = images;
+        room.currentImage = images[0]; // Start with the first image
+        room.guesses = [];
+        room.currentRound += 1;
+        room.attemptsLeft = 3;
+        room.waitingForGuess = true;
+        room.waitingForPrompt = false;
+        
+        // Send initial message for single player mode
+        ws.send(JSON.stringify({
+          type: 'roundStart',
+          message: `Round ${room.currentRound} - Make your guess!`
+        }));
       
-      // Get or generate images for the word
-      console.log('Fetching images for word:', room.word);
-      const images = await getOrGenerateImages(room.word);
-      console.log(`Retrieved ${images.length} images for word:`, room.word);
-      
-      if (!images || images.length === 0) {
-        throw new Error('No images available for the word');
+        console.log('New round started successfully:', {
+          word: room.word,
+          imageCount: images.length,
+          currentRound: room.currentRound
+        });
+        
+        sendGameState();
+      } catch (error) {
+        console.error('Error in inner try block:', error);
+        room.error = 'Failed to start new round. Please try again.';
+        ws.send(JSON.stringify({ error: 'Failed to start new round' }));
       }
-      
-      room.availableImages = images;
-      room.currentImage = images[0]; // Start with the first image
-      room.guesses = [];
-      room.currentRound += 1;
-      room.attemptsLeft = 3;
-      room.waitingForGuess = true;
-      room.waitingForPrompt = false;
-      
-      console.log('New round started successfully:', {
-        word: room.word,
-        imageCount: images.length,
-        currentRound: room.currentRound
-      });
-      
-      sendGameState();
     } catch (error) {
-      console.error('Error starting new round:', error);
-      room.error = 'Failed to start new round. Please try again.';
+      console.error('Error in outer try block:', error);
       ws.send(JSON.stringify({ error: 'Failed to start new round' }));
     }
   }
@@ -495,8 +508,8 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
     }
   });
 
-  // Send initial game state
-  sendGameState();
+  // Start the first round
+  await startNewRound();
 
   // Cleanup on disconnect
   ws.on("close", () => {
@@ -507,6 +520,4 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
       rooms.delete(room.code);
     }
   });
-
-  return true;
 }
