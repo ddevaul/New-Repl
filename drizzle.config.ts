@@ -10,6 +10,9 @@ export default {
     password: process.env.PGPASSWORD,
     database: process.env.PGDATABASE!,
     port: Number(process.env.PGPORT),
+    ssl: {
+      rejectUnauthorized: false
+    }
   },
   verbose: true,
   strict: true,

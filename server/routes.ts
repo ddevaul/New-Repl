@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { signup, login, authMiddleware, checkGameLimit } from "./auth.js";
-import { isAdmin, getAllUsers, updateUserGamesLimit, addWord, uploadImage, generateImages, getStatus, getActivityLogs } from "./admin.js";
+import { isAdmin, getAllUsers, updateUserGamesLimit, addWord, uploadImage, generateImages, getStatus } from "./admin.js";
 import { 
   rooms, 
   type Room, 
@@ -10,6 +10,7 @@ import {
   getRandomWord,
   roomConnections
 } from "./game.js";
+import { getAllActivities } from "./services/activityLogger.js";
 import { db } from "../db/index.js";
 import { highScores, preGeneratedImages } from "../db/schema.js";
 import { desc, eq } from "drizzle-orm";
@@ -27,7 +28,15 @@ export function registerRoutes(app: Express): Server {
   // Admin routes
   app.get("/api/admin/users", authMiddleware, isAdmin, getAllUsers);
   app.put("/api/admin/users/:userId/games-limit", authMiddleware, isAdmin, updateUserGamesLimit);
-  app.get("/api/admin/activity-logs", authMiddleware, isAdmin, getActivityLogs);
+  app.get("/api/admin/activity-logs", authMiddleware, isAdmin, async (req, res) => {
+    try {
+      const logs = await getAllActivities();
+      res.json(logs);
+    } catch (error) {
+      console.error('Error fetching activity logs:', error);
+      res.status(500).send("Error fetching activity logs");
+    }
+  });
   
   // Word and image management routes (admin only)
   app.post("/api/admin/words", authMiddleware, isAdmin, addWord);
