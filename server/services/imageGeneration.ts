@@ -22,8 +22,8 @@ export async function generateImage(prompt: string): Promise<string> {
         text: `A simple, clear illustration of ${prompt}. Minimalist style, clean lines, white background.`
       }],
       cfg_scale: 7,
-      height: 512,
-      width: 512,
+      height: 1024,
+      width: 1024,
       samples: 1,
       style_preset: "digital-art"
     };
