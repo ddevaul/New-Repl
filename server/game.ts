@@ -63,11 +63,12 @@ async function getOrGenerateImages(word: string): Promise<string[]> {
     }
 
     console.log('No existing images found, generating new ones for word:', word);
-    const prompts = [
+    // For multiplayer mode, use the provided prompt. For singleplayer, use predefined prompts
+    const prompts = room?.gameMode === 'single' ? [
       `Create a simple, minimalistic illustration of ${word} using clean lines and basic shapes. Make it clear and easy to recognize.`,
       `Draw ${word} in a straightforward way that a child could understand. Use clear outlines and simple details.`,
       `Show me ${word} in its most basic, recognizable form. Focus on the essential features that make it identifiable.`
-    ];
+    ] : [message.prompt];
 
     const generatedImages: string[] = [];
     for (const prompt of prompts) {
@@ -209,18 +210,26 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             break;
           }
 
-          // Validate drawer permissions in multiplayer mode
-          if (room.gameMode !== 'single' && !connectingPlayer.isDrawer) {
-            console.error('Non-drawer attempted to generate image:', playerId);
-            ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
-            break;
-          }
+          // In multiplayer mode, verify drawer permissions
+          if (room.gameMode !== 'single') {
+            if (!connectingPlayer.isDrawer) {
+              console.error('Non-drawer attempted to generate image:', playerId);
+              ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
+              break;
+            }
 
-          // Prevent duplicate image generation
-          if (room.currentImage) {
-            console.log('Images already generated for current word:', room.word);
-            ws.send(JSON.stringify({ error: 'Images already generated for this word' }));
-            break;
+            // For multiplayer, prevent multiple prompts
+            if (room.currentImage) {
+              console.error('Images already generated for current round');
+              ws.send(JSON.stringify({ error: 'Images already generated for this round' }));
+              break;
+            }
+
+            if (!message.prompt) {
+              console.error('No prompt provided for image generation');
+              ws.send(JSON.stringify({ error: 'Please provide a prompt for image generation' }));
+              break;
+            }
           }
 
           try {
