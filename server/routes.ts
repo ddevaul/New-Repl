@@ -73,8 +73,10 @@ export function registerRoutes(app: Express): Server {
     };
 
     if (gameMode === "single") {
-        room.players[0].isDrawer = false; // In single player, you're the guesser
+        // In single player, AI is the drawer and player is always the guesser
+        room.players[0].isDrawer = false;
         room.status = 'playing';
+        
         // Generate an AI image for the word
         console.log('Starting single player game image generation for word:', room.word);
         try {
@@ -83,17 +85,16 @@ export function registerRoutes(app: Express): Server {
             room.currentImage = PLACEHOLDER_IMAGE;
           } else {
             console.log('Calling image generation service for word:', room.word);
-            const imageData = await generateImage(room.word);
+            // Use a more descriptive prompt for better image generation
+            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+            const imageData = await generateImage(prompt);
             
             if (imageData === PLACEHOLDER_IMAGE) {
-              console.log('Received placeholder image from generation service');
+              console.error('Failed to generate image, using placeholder');
               room.currentImage = PLACEHOLDER_IMAGE;
-            } else if (imageData.startsWith('data:image/png;base64,')) {
-              console.log('Successfully received base64 image data');
-              room.currentImage = imageData;
             } else {
-              console.error('Unexpected image data format:', imageData.substring(0, 100));
-              room.currentImage = PLACEHOLDER_IMAGE;
+              console.log('Successfully generated image for single player game');
+              room.currentImage = imageData;
             }
           }
         } catch (error: any) {
@@ -101,9 +102,11 @@ export function registerRoutes(app: Express): Server {
           room.currentImage = PLACEHOLDER_IMAGE;
         }
         
-        // Always set these states regardless of image generation outcome
-        room.waitingForPrompt = false;
-        room.waitingForGuess = true;
+        // Set initial game state
+        room.waitingForPrompt = false; // AI has already generated the image
+        room.waitingForGuess = true;   // Waiting for player's guess
+        room.drawerPrompts = [];       // No prompts needed in single player
+        room.attemptsLeft = 3;         // Player gets 3 attempts to guess
       }
     
     rooms.set(code, room);
