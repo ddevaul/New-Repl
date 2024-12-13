@@ -92,7 +92,7 @@ export const selectHighScoreSchema = createSelectSchema(highScores);
 
 export const preGeneratedImages = pgTable("pre_generated_images", {
   id: serial("id").primaryKey(),
-  word: text("word").notNull(),
+  word: text("word").notNull().unique(),
   imageUrl: text("image_url").notNull(),
   createdAt: timestamp("created_at").defaultNow()
 });

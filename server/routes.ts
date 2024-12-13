@@ -77,7 +77,7 @@ export function registerRoutes(app: Express): Server {
       });
       
       if (preGenerated) {
-        room.currentImage = preGenerated.image_url;
+        room.currentImage = preGenerated.imageUrl;
       }
     }
     
