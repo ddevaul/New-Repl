@@ -94,13 +94,25 @@ export function registerRoutes(app: Express): Server {
           
           console.log('Starting single player game image generation for word:', room.word);
           try {
-            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
-            const imageData = await generateImage(prompt);
+            // First try to find a pre-generated image
+            const preGenerated = await db.query.preGeneratedImages.findFirst({
+              where: eq(preGeneratedImages.word, room.word.toLowerCase())
+            });
+
+            let imageData;
+            if (preGenerated) {
+              console.log('Found pre-generated image for word:', room.word);
+              imageData = preGenerated.imageUrl;
+            } else {
+              console.log('No pre-generated image found, generating new one for:', room.word);
+              const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+              imageData = await generateImage(prompt);
+            }
             
             if (imageData === PLACEHOLDER_IMAGE) {
-              console.error('Failed to generate image, using placeholder');
+              console.error('Failed to get/generate image, using placeholder');
             } else {
-              console.log('Successfully generated image for single player game');
+              console.log('Successfully got image for single player game');
               room.currentImage = imageData;
               
               // Notify connected clients about the new image
