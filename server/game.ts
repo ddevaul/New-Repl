@@ -432,12 +432,32 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
     console.log(`Setting up single player handlers for player ${player.name} in room ${room.code}`);
     
+    // Force player to be guesser in single player mode
+    player.isDrawer = false;
+    room.gameMode = 'single';
+    room.status = 'playing';
+    
     // Initialize connections for the room if they don't exist
     if (!roomConnections.has(room.code)) {
       roomConnections.set(room.code, new Map());
     }
     const connections = roomConnections.get(room.code)!;
     connections.set(player.id, ws);
+
+    console.log('Single player game state initialized:', {
+      player: {
+        id: player.id,
+        name: player.name,
+        isDrawer: player.isDrawer
+      },
+      room: {
+        code: room.code,
+        status: room.status,
+        currentRound: room.currentRound,
+        word: room.word,
+        hasImage: !!room.currentImage
+      }
+    });
 
     // Function to start a new round
     async function startNewRound() {

@@ -90,70 +90,46 @@ export function registerRoutes(app: Express): Server {
     };
 
     if (gameMode === "single") {
-        // In single player, AI is the drawer and player is always the guesser
-        room.players[0].isDrawer = false;
+        // In single player, player is always the guesser
+        room.players[0].isDrawer = false; // Force player to be guesser
         room.status = 'playing';
         room.currentImage = PLACEHOLDER_IMAGE; // Set placeholder initially
         
         // Set initial game state
-        room.waitingForPrompt = false; // AI has already generated the image
+        room.waitingForPrompt = false; // AI handles image selection
         room.waitingForGuess = true;   // Waiting for player's guess
         room.drawerPrompts = [];       // No prompts needed in single player
         room.attemptsLeft = 3;         // Player gets 3 attempts to guess
 
-        // Start image generation in the background after sending response
-        setTimeout(async () => {
+        // Fetch pre-generated image immediately
+        try {
           if (!room.word) {
-            console.error('No word provided for image generation');
-            return;
+            console.error('No word provided for single player game');
+            throw new Error('Word not set for single player game');
           }
           
-          console.log('Starting single player game image generation for word:', room.word);
-          try {
-            // First try to find pre-generated images
-            const preGenerated = await db.query.preGeneratedImages.findMany({
-              where: eq(preGeneratedImages.word, room.word.toLowerCase())
-            });
+          console.log('Starting single player game for word:', room.word);
+          
+          // Get pre-generated images
+          const preGenerated = await db.query.preGeneratedImages.findMany({
+            where: eq(preGeneratedImages.word, room.word.toLowerCase())
+          });
 
-            let imageData;
-            if (preGenerated && preGenerated.length > 0) {
-              // Randomly select one of the pre-generated images
-              const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
-              console.log(`Found ${preGenerated.length} pre-generated images for word:`, room.word);
-              imageData = randomImage.imageUrl;
-            } else {
-              console.log('No pre-generated image found, generating new one for:', room.word);
-              const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
-              imageData = await generateImage(prompt);
-            }
-            
-            if (imageData === PLACEHOLDER_IMAGE) {
-              console.error('Failed to get/generate image, using placeholder');
-            } else {
-              console.log('Successfully got image for single player game');
-              room.currentImage = imageData;
-              
-              // Notify connected clients about the new image
-              const connections = roomConnections.get(code);
-              if (connections) {
-                connections.forEach(client => {
-                  if (client.readyState === WebSocket.OPEN) {
-                    const state = {
-                      type: 'stateUpdate',
-                      currentImage: imageData,
-                      waitingForGuess: true,
-                      waitingForPrompt: false
-                    };
-                    console.log('Sending updated game state to client:', { roomCode: code });
-                    client.send(JSON.stringify(state));
-                  }
-                });
-              }
-            }
-          } catch (error) {
-            console.error('Single player image generation error:', error);
+          if (!preGenerated || preGenerated.length === 0) {
+            console.error('No pre-generated images found for word:', room.word);
+            throw new Error(`No pre-generated images found for word: ${room.word}`);
           }
-        }, 0);
+
+          // Randomly select one of the pre-generated images
+          const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
+          console.log(`Selected image ${randomImage.id} from ${preGenerated.length} pre-generated images for word:`, room.word);
+          room.currentImage = randomImage.imageUrl;
+          
+          console.log('Successfully initialized single player game with pre-generated image');
+        } catch (error) {
+          console.error('Single player initialization error:', error);
+          room.currentImage = PLACEHOLDER_IMAGE;
+        }
       }
     
     rooms.set(code, room);
