@@ -3,8 +3,11 @@ import { Request as ExpressRequest, Response } from "express";
 interface Request extends ExpressRequest {
   user?: {
     id: number;
+    isAdmin?: boolean;
   };
 }
+
+export type { Request };
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "../db/index.js";
@@ -37,8 +40,11 @@ export async function signup(req: Request, res: Response) {
       gamesPlayed: 0,
     }).returning();
 
-    // Generate JWT
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    // Generate JWT with isAdmin flag
+    const token = jwt.sign({ 
+      id: user.id,
+      isAdmin: user.isAdmin 
+    }, JWT_SECRET, { expiresIn: '24h' });
 
     res.json({ 
       token, 
@@ -85,8 +91,11 @@ export async function login(req: Request, res: Response) {
 
     console.log('Login successful for user:', email);
 
-    // Generate JWT
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    // Generate JWT with isAdmin flag
+    const token = jwt.sign({ 
+      id: user.id,
+      isAdmin: user.isAdmin 
+    }, JWT_SECRET, { expiresIn: '24h' });
 
     res.json({ 
       token, 
@@ -112,11 +121,15 @@ export function authMiddleware(req: Request, res: Response, next: Function) {
       return res.status(401).send("Access denied. No token provided.");
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
-    req.user = decoded;
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; isAdmin?: boolean };
+    req.user = {
+      id: decoded.id,
+      isAdmin: decoded.isAdmin
+    };
     next();
   } catch (error) {
-    res.status(400).send("Invalid token");
+    console.error('Auth middleware error:', error);
+    res.status(401).send("Invalid token");
   }
 }
 
@@ -135,12 +148,13 @@ export async function checkGameLimit(req: Request, res: Response, next: Function
       return res.status(400).send("User not found");
     }
 
-    if (user.gamesPlayed && user.gamesPlayed >= 3) {
+    if (user.gamesPlayed >= (user.gamesLimit || 3)) {
       return res.status(403).send("Free game limit reached");
     }
 
     next();
   } catch (error) {
+    console.error('Game limit check error:', error);
     res.status(500).send("Error checking game limit");
   }
 }
