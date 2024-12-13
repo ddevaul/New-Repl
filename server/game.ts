@@ -175,7 +175,6 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
         const state = {
           ...room,
-          attemptsLeft: room.attemptsLeft,
           players: room.players.map(p => ({
             id: p.id,
             name: p.name,
@@ -200,19 +199,29 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
       switch (message.type) {
         case 'prompt':
-          if (!room.word) break;
+          if (!room.word) {
+            console.error('No word set for room');
+            ws.send(JSON.stringify({ error: 'No word set for room' }));
+            break;
+          }
           
           try {
+            console.log('Processing prompt message:', {
+              playerId,
+              isDrawer: connectingPlayer.isDrawer,
+              gameMode: room.gameMode
+            });
+
             // In multiplayer mode, verify drawer permissions
             if (room.gameMode !== 'single') {
-              const drawer = room.players.find(p => p.isDrawer);
-              if (!drawer || drawer.id !== playerId) {
+              if (!connectingPlayer.isDrawer) {
+                console.error('Non-drawer attempted to generate image:', playerId);
                 ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
                 break;
               }
             }
 
-            console.log('Generating images for word:', room.word);
+            console.log('Starting image generation for word:', room.word);
             const images = await getOrGenerateImages(room.word);
             
             if (!images || images.length === 0) {
@@ -231,12 +240,10 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             broadcastGameState();
             
             // Notify about successful image generation
-            if (room.gameMode !== 'single') {
-              ws.send(JSON.stringify({
-                type: 'imageGenerated',
-                message: 'Image generated successfully'
-              }));
-            }
+            ws.send(JSON.stringify({
+              type: 'imageGenerated',
+              message: 'Image generated successfully'
+            }));
           } catch (error) {
             console.error('Error generating images:', error);
             ws.send(JSON.stringify({ 
@@ -251,7 +258,6 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           const guesser = room.players.find(p => !p.isDrawer);
           if (!guesser) break;
 
-          const currentGuessIndex = room.guesses.length;
           room.guesses.push({
             text: message.guess,
             player: guesser.name,
@@ -280,7 +286,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               if (client.readyState === 1) {
                 client.send(JSON.stringify({
                   type: 'roundComplete',
-                  message: `Correct! The word was "${message.guess}". Moving to next round...`
+                  message: `Correct! The word was "${room.word}". Moving to next round...`
                 }));
               }
             });
@@ -306,7 +312,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               room.currentImage = null;
               room.attemptsLeft = 3;
               room.waitingForGuess = false;
-              room.waitingForPrompt = false;
+              room.waitingForPrompt = true;
             }
           } else if (room.guesses.length >= 3) {
             // Out of attempts
@@ -330,7 +336,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               room.currentImage = null;
               room.attemptsLeft = 3;
               room.waitingForGuess = false;
-              room.waitingForPrompt = false;
+              room.waitingForPrompt = true;
             }
           }
           
@@ -361,7 +367,6 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
   });
 }
 
-// Single player specific game handlers
 async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
   console.log(`Setting up single player handlers for player ${player.name} in room ${room.code}`);
   
@@ -375,6 +380,23 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
   const connections = roomConnections.get(room.code)!;
   connections.set(player.id, ws);
 
+  // Function to send game state
+  function sendGameState() {
+    const state = {
+      ...room,
+      players: room.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        isDrawer: p.isDrawer,
+        score: p.score
+      })),
+      word: undefined, // Never send word to player
+      attemptsLeft: room.attemptsLeft
+    };
+
+    ws.send(JSON.stringify(state));
+  }
+
   // Function to start a new round
   async function startNewRound() {
     try {
@@ -386,6 +408,7 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
         room.guesses = [];
         room.currentImage = null;
         room.error = undefined;
+        room.attemptsLeft = 3;
         
         // Get or generate images for the word
         console.log('Fetching images for word:', room.word);
@@ -400,7 +423,6 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
         room.currentImage = images[0]; // Start with the first image
         room.guesses = [];
         room.currentRound += 1;
-        room.attemptsLeft = 3;
         room.waitingForGuess = true;
         room.waitingForPrompt = false;
         
@@ -428,23 +450,6 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
     }
   }
 
-  // Function to send game state
-  function sendGameState() {
-    const state = {
-      ...room,
-      players: room.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        isDrawer: p.isDrawer,
-        score: p.score
-      })),
-      word: undefined, // Never send word to player
-      attemptsLeft: Math.max(0, 3 - (room.guesses?.length || 0))
-    };
-
-    ws.send(JSON.stringify(state));
-  }
-
   // Handle incoming messages
   ws.on('message', async (data) => {
     try {
@@ -458,7 +463,7 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
           timestamp: new Date().toISOString()
         });
 
-        const isCorrect = message.guess.toLowerCase() === room.word.toLowerCase();
+        const isCorrect = message.guess.toLowerCase() === room.word?.toLowerCase();
         const attemptsUsed = room.guesses.length;
 
         if (isCorrect) {
@@ -480,34 +485,41 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
           } else {
             setTimeout(() => startNewRound(), 1000);
           }
-        } else if (attemptsUsed >= 3) {
-          ws.send(JSON.stringify({
-            type: 'roundComplete',
-            message: `Out of attempts! The word was "${room.word}"`
-          }));
-
-          if (room.currentRound >= 6) {
-            room.status = 'ended';
-            ws.send(JSON.stringify({
-              type: 'gameComplete',
-              message: `Game Over! Final score: ${player.score} points`
-            }));
-          } else {
-            setTimeout(() => startNewRound(), 1000);
-          }
         } else {
-          // Show next image if available
-          if (room.availableImages && room.availableImages.length > attemptsUsed) {
-            room.currentImage = room.availableImages[attemptsUsed];
-          }
+          const remainingAttempts = 3 - attemptsUsed;
           
-          ws.send(JSON.stringify({
-            type: 'wrongGuess',
-            message: `Wrong guess! You have ${3 - attemptsUsed} ${3 - attemptsUsed === 1 ? 'try' : 'tries'} left.`
-          }));
-        }
+          if (remainingAttempts > 0) {
+            // Show next image if available
+            if (room.availableImages && attemptsUsed < room.availableImages.length) {
+              room.currentImage = room.availableImages[attemptsUsed];
+              console.log(`Wrong guess. Showing image ${attemptsUsed + 1}/${room.availableImages.length}`);
+            }
+            
+            room.attemptsLeft = remainingAttempts;
+            
+            ws.send(JSON.stringify({
+              type: 'wrongGuess',
+              message: `Wrong guess! You have ${remainingAttempts} ${remainingAttempts === 1 ? 'try' : 'tries'} left.`
+            }));
+            
+            sendGameState();
+          } else {
+            ws.send(JSON.stringify({
+              type: 'roundComplete',
+              message: `Out of attempts! The word was "${room.word}"`
+            }));
 
-        sendGameState();
+            if (room.currentRound >= 6) {
+              room.status = 'ended';
+              ws.send(JSON.stringify({
+                type: 'gameComplete',
+                message: `Game Over! Final score: ${player.score} points`
+              }));
+            } else {
+              setTimeout(() => startNewRound(), 1000);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error processing message:', error);
