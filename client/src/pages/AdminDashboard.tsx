@@ -262,142 +262,31 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === 'logs' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Activities
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activityLogs.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Active Users Today
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {new Set(activityLogs
-                    .filter(log => new Date(log.createdAt).toDateString() === new Date().toDateString())
-                    .map(log => log.userId)).size}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Games Started Today
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {activityLogs.filter(log => 
-                    log.actionType === 'game_start' && 
-                    new Date(log.createdAt).toDateString() === new Date().toDateString()
-                  ).length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Images Generated Today
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {activityLogs.filter(log => 
-                    log.actionType === 'image_generate' && 
-                    new Date(log.createdAt).toDateString() === new Date().toDateString()
-                  ).length}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          <div className="flex gap-4 items-center">
-            <select
-              className="px-3 py-2 rounded-md border"
-              onChange={(e) => {
-                const type = e.target.value;
-                const filtered = type === 'all' 
-                  ? activityLogs 
-                  : activityLogs.filter(log => log.actionType === type);
-                setActivityLogs(filtered);
-              }}
-            >
-              <option value="all">All Activities</option>
-              <option value="login">Logins</option>
-              <option value="game_start">Game Starts</option>
-              <option value="game_end">Game Ends</option>
-              <option value="word_add">Word Updates</option>
-              <option value="image_generate">Image Generation</option>
-              <option value="user_update">User Updates</option>
-              <option value="admin_action">Admin Actions</option>
-            </select>
-            <Input
-              type="date"
-              className="w-auto"
-              onChange={(e) => {
-                const date = new Date(e.target.value);
-                const filtered = activityLogs.filter(log => 
-                  new Date(log.createdAt).toDateString() === date.toDateString()
-                );
-                setActivityLogs(filtered);
-              }}
-            />
-          </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead>Time</TableHead>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Time</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {activityLogs.map((log) => (
+                <TableRow key={log.id}>
+                  <TableCell>{log.user?.name || 'Unknown'}</TableCell>
+                  <TableCell>{log.actionType}</TableCell>
+                  <TableCell>
+                    {log.details ? JSON.stringify(log.details) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(log.createdAt).toLocaleString()}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activityLogs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>{log.user?.name || 'Unknown'}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-sm ${
-                        log.actionType === 'login' ? 'bg-blue-100 text-blue-800' :
-                        log.actionType === 'game_start' ? 'bg-green-100 text-green-800' :
-                        log.actionType === 'game_end' ? 'bg-yellow-100 text-yellow-800' :
-                        log.actionType === 'word_add' ? 'bg-purple-100 text-purple-800' :
-                        log.actionType === 'image_generate' ? 'bg-pink-100 text-pink-800' :
-                        log.actionType === 'user_update' ? 'bg-orange-100 text-orange-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {log.actionType.replace('_', ' ')}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {log.details ? (
-                        <div className="max-w-xs overflow-hidden text-sm">
-                          {Object.entries(JSON.parse(log.details)).map(([key, value]) => (
-                            <div key={key} className="flex gap-2">
-                              <span className="font-medium">{key}:</span>
-                              <span className="text-muted-foreground">{String(value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(log.createdAt).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
