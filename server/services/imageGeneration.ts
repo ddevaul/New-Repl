@@ -61,9 +61,13 @@ export async function generateImage(prompt: string): Promise<string> {
     const imageData = Buffer.from(responseData.artifacts[0].base64, 'base64');
     
     // Process and store the image
-    const key = `generated/${Date.now()}-${prompt.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
     try {
-      const imageUrl = await processAndStoreImage(prompt, imageData);
+      // Convert base64 to buffer
+      const imageBuffer = Buffer.from(responseData.artifacts[0].base64, 'base64');
+      const key = `generated/${Date.now()}-${prompt.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
+      console.log('Attempting to process and store image with key:', key);
+      
+      const imageUrl = await processAndStoreImage(prompt, imageBuffer);
       console.log('Successfully generated and stored image:', { prompt, key, imageUrl });
       return imageUrl;
     } catch (storageError) {

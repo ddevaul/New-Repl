@@ -8,9 +8,12 @@ import { eq } from "drizzle-orm";
 // Function to process and store an AI-generated image
 export async function processAndStoreImage(word: string, imageBuffer: Buffer): Promise<string> {
   try {
-    console.log(`Starting image processing for word: ${word}`);
+    console.log(`Starting image processing for word: ${word}`, {
+      bufferLength: imageBuffer.length,
+      isBuffer: Buffer.isBuffer(imageBuffer)
+    });
     
-    if (!imageBuffer || imageBuffer.length === 0) {
+    if (!Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
       throw new Error('Invalid image buffer received');
     }
     

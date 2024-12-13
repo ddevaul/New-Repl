@@ -51,10 +51,19 @@ export async function getImageUrl(key: string): Promise<string> {
   console.log('Generating URL for image:', { bucket: BUCKET_NAME, key });
 
   try {
-    // For DigitalOcean Spaces, we can construct the public URL directly
-    const publicUrl = `https://${BUCKET_NAME}.${process.env.S3_ENDPOINT!.replace('https://', '')}/${key}`;
-    console.log('Generated public URL:', publicUrl);
-    return publicUrl;
+    // For DigitalOcean Spaces, construct the public URL
+    const endpoint = process.env.S3_ENDPOINT!.replace('https://', '').replace('http://', '');
+    const publicUrl = `https://${BUCKET_NAME}.${endpoint}/${key}`;
+    
+    // Verify the URL is properly formed
+    try {
+      new URL(publicUrl);
+      console.log('Generated valid public URL:', publicUrl);
+      return publicUrl;
+    } catch (urlError) {
+      console.error('Generated invalid URL:', publicUrl);
+      throw new Error('Failed to generate valid image URL');
+    }
   } catch (error) {
     console.error('Error generating public URL:', error);
     throw new Error(`Failed to generate image URL: ${error.message}`);
