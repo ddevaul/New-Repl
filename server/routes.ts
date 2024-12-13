@@ -73,7 +73,7 @@ export function registerRoutes(app: Express): Server {
       players: [{
         id: nextPlayerId++,
         name: playerName,
-        isDrawer: false,
+        isDrawer: gameMode === 'multi', // First player is drawer in multiplayer
         score: 0
       }],
       word: getRandomWord(),
@@ -178,9 +178,12 @@ export function registerRoutes(app: Express): Server {
     const newPlayer = {
       id: nextPlayerId++,
       name: playerName,
-      isDrawer: false,
+      isDrawer: false, // Second player is always guesser
       score: 0
     };
+
+    // Make sure first player is drawer
+    room.players[0].isDrawer = true;
 
     room.players.push(newPlayer);
 

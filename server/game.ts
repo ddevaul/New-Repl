@@ -211,11 +211,14 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           });
 
           // Check if we need to show the next image for wrong guess
-          if (message.guess.toLowerCase() !== room.word.toLowerCase() && 
-              room.availableImages && 
-              room.availableImages.length > currentGuessIndex + 1) {
-            room.currentImage = room.availableImages[currentGuessIndex + 1];
-            console.log(`Showing next image ${currentGuessIndex + 1} for word:`, room.word);
+          // Handle wrong guess - show next image if available
+          if (message.guess.toLowerCase() !== room.word.toLowerCase()) {
+            const nextImageIndex = room.guesses.length;
+            if (room.availableImages && nextImageIndex < room.availableImages.length) {
+              room.currentImage = room.availableImages[nextImageIndex];
+              console.log(`Wrong guess. Showing image ${nextImageIndex + 1}/${room.availableImages.length} for word:`, room.word);
+            }
+            room.attemptsLeft = Math.max(0, 3 - room.guesses.length);
           }
 
           if (message.guess.toLowerCase() === room.word.toLowerCase()) {
@@ -330,6 +333,11 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
     try {
       room.word = getRandomWord();
       console.log('Starting new round with word:', room.word);
+      
+      // Clear previous state
+      room.guesses = [];
+      room.currentImage = null;
+      room.error = undefined;
       
       // Get or generate images for the word
       console.log('Fetching images for word:', room.word);
