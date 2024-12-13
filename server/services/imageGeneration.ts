@@ -30,11 +30,11 @@ export async function generateImage(prompt: string): Promise<string> {
         weight: 1
       }],
       cfg_scale: 7,
-      height: 512,
-      width: 512,
+      height: 1024,
+      width: 1024,
       samples: 1,
       steps: 50,
-      style_preset: "photographic",
+      style_preset: "digital-art",
       sampler: "K_EULER"
     };
 
