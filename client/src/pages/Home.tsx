@@ -10,6 +10,7 @@ import { useEffect } from "react";
 export default function Home() {
   const [, setLocation] = useLocation();
   const [playerName, setPlayerName] = useState("");
+  const [gameMode, setGameMode] = useState<"single" | "multi">("multi");
   const { toast } = useToast();
 
   // Check for authentication on component mount
@@ -41,7 +42,10 @@ export default function Home() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ playerName: playerName.trim() })
+        body: JSON.stringify({ 
+          playerName: playerName.trim(),
+          gameMode
+        })
       });
       if (!res.ok) {
         const error = await res.text();
@@ -106,43 +110,71 @@ export default function Home() {
               AI Pictionary
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Enter your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-            />
-            <div className="grid gap-4">
-              <Button
-                disabled={!playerName}
-                onClick={() => createRoom.mutate()}
-                className="w-full"
-              >
-                Create Room
-              </Button>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or join existing
-                  </span>
-                </div>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <Button
+                  onClick={() => setGameMode("single")}
+                  variant={gameMode === "single" ? "default" : "outline"}
+                  className="flex-1"
+                >
+                  Single Player
+                </Button>
+                <Button
+                  onClick={() => setGameMode("multi")}
+                  variant={gameMode === "multi" ? "default" : "outline"}
+                  className="flex-1"
+                >
+                  Multiplayer
+                </Button>
               </div>
               <Input
-                placeholder="Enter room code"
-                onChange={(e) => {
-                  if (playerName && e.target.value.length === 6) {
-                    joinRoom.mutate(e.target.value);
-                  }
-                }}
+                placeholder="Enter your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
               />
+            </div>
+            <div className="grid gap-4">
+              {gameMode === "multi" ? (
+                <>
+                  <Button
+                    disabled={!playerName}
+                    onClick={() => createRoom.mutate()}
+                    className="w-full"
+                  >
+                    Create Room
+                  </Button>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">
+                        Or join existing
+                      </span>
+                    </div>
+                  </div>
+                  <Input
+                    placeholder="Enter room code"
+                    onChange={(e) => {
+                      if (playerName && e.target.value.length === 6) {
+                        joinRoom.mutate(e.target.value);
+                      }
+                    }}
+                  />
+                </>
+              ) : (
+                <Button
+                  disabled={!playerName}
+                  onClick={() => createRoom.mutate()}
+                  className="w-full"
+                >
+                  Start Single Player Game
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
-
-        
       </div>
     </div>
   );

@@ -79,10 +79,14 @@ export default function Room() {
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">Room Code: {code}</h1>
-            <p className="text-sm text-muted-foreground">
-              {playerId ? `Your ID: ${playerId}` : 'Connecting...'}
-            </p>
+            <h1 className="text-2xl font-bold">
+              {room.gameMode === "single" ? "Single Player Game" : `Room Code: ${code}`}
+            </h1>
+            {room.gameMode === "multi" && (
+              <p className="text-sm text-muted-foreground">
+                {playerId ? `Your ID: ${playerId}` : 'Connecting...'}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {room.players.map((player: {id: number; name: string; isDrawer: boolean; score: number}) => (

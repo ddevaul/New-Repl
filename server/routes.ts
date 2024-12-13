@@ -43,7 +43,7 @@ export function registerRoutes(app: Express): Server {
 
   // Create room (protected route)
   app.post("/api/rooms", authMiddleware, checkGameLimit, async (req, res) => {
-    const { playerName } = req.body;
+    const { playerName, gameMode = "multi" } = req.body;
     if (!playerName) {
       return res.status(400).json({ message: "Player name is required" });
     }
@@ -52,12 +52,12 @@ export function registerRoutes(app: Express): Server {
     const room: Room = {
       id: nextRoomId++,
       code,
-      status: 'waiting',
+      status: gameMode === "single" ? 'playing' : 'waiting',
       currentRound: 1,
       players: [{
         id: nextPlayerId++,
         name: playerName,
-        isDrawer: true,
+        isDrawer: gameMode === "multi",
         score: 0
       }],
       word: getRandomWord(),
@@ -66,8 +66,20 @@ export function registerRoutes(app: Express): Server {
       currentImage: null,
       attemptsLeft: 3,
       waitingForGuess: false,
-      waitingForPrompt: false
+      waitingForPrompt: false,
+      gameMode
     };
+
+    if (gameMode === "single") {
+      // Fetch a pre-generated image for single player mode
+      const preGenerated = await db.query.preGeneratedImages.findFirst({
+        where: eq(preGeneratedImages.word, room.word)
+      });
+      
+      if (preGenerated) {
+        room.currentImage = preGenerated.image_url;
+      }
+    }
     
     rooms.set(code, room);
     console.log(`Created room ${code} with word "${room.word}"`);
