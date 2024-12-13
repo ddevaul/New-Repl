@@ -13,9 +13,29 @@ export default function Prompt({ socket, word, attemptsLeft }: PromptProps) {
   const [prompt, setPrompt] = useState("");
   const { toast } = useToast();
 
+  const checkWordSimilarity = (prompt: string, word: string): boolean => {
+    const promptWords = prompt.toLowerCase().split(/\s+/);
+    const targetWord = word.toLowerCase();
+    const targetWords = targetWord.split(/\s+/);
+    
+    return promptWords.some(pWord => 
+      targetWords.some(tWord => 
+        // Check for exact match or if one word contains the other
+        tWord === pWord || 
+        tWord.includes(pWord) || 
+        pWord.includes(tWord) ||
+        // Check for simple plural forms
+        tWord + 's' === pWord ||
+        tWord === pWord + 's'
+      )
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) {
+    const trimmedPrompt = prompt.trim();
+    
+    if (!trimmedPrompt) {
       toast({
         title: "Error",
         description: "Please enter a prompt",
@@ -24,9 +44,18 @@ export default function Prompt({ socket, word, attemptsLeft }: PromptProps) {
       return;
     }
 
+    if (word && checkWordSimilarity(trimmedPrompt, word)) {
+      toast({
+        title: "Error",
+        description: "You can't use the actual word or similar variations. Try describing it differently!",
+        variant: "destructive"
+      });
+      return;
+    }
+
     socket.send(JSON.stringify({
       type: "prompt",
-      prompt: prompt.trim()
+      prompt: trimmedPrompt
     }));
     setPrompt("");
   };
