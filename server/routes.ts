@@ -76,37 +76,49 @@ export function registerRoutes(app: Express): Server {
         // In single player, AI is the drawer and player is always the guesser
         room.players[0].isDrawer = false;
         room.status = 'playing';
-        
-        // Generate an AI image for the word
-        console.log('Starting single player game image generation for word:', room.word);
-        try {
-          if (!room.word) {
-            console.error('No word provided for image generation');
-            room.currentImage = PLACEHOLDER_IMAGE;
-          } else {
-            console.log('Calling image generation service for word:', room.word);
-            // Use a more descriptive prompt for better image generation
-            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
-            const imageData = await generateImage(prompt);
-            
-            if (imageData === PLACEHOLDER_IMAGE) {
-              console.error('Failed to generate image, using placeholder');
-              room.currentImage = PLACEHOLDER_IMAGE;
-            } else {
-              console.log('Successfully generated image for single player game');
-              room.currentImage = imageData;
-            }
-          }
-        } catch (error: any) {
-          console.error('Single player image generation error:', error);
-          room.currentImage = PLACEHOLDER_IMAGE;
-        }
+        room.currentImage = PLACEHOLDER_IMAGE; // Set placeholder initially
         
         // Set initial game state
         room.waitingForPrompt = false; // AI has already generated the image
         room.waitingForGuess = true;   // Waiting for player's guess
         room.drawerPrompts = [];       // No prompts needed in single player
         room.attemptsLeft = 3;         // Player gets 3 attempts to guess
+
+        // Start image generation in the background after sending response
+        setTimeout(async () => {
+          if (!room.word) {
+            console.error('No word provided for image generation');
+            return;
+          }
+          
+          console.log('Starting single player game image generation for word:', room.word);
+          try {
+            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+            const imageData = await generateImage(prompt);
+            
+            if (imageData === PLACEHOLDER_IMAGE) {
+              console.error('Failed to generate image, using placeholder');
+            } else {
+              console.log('Successfully generated image for single player game');
+              room.currentImage = imageData;
+              
+              // Notify connected clients about the new image
+              const connections = roomConnections.get(code);
+              if (connections) {
+                connections.forEach(client => {
+                  if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({
+                      type: 'stateUpdate',
+                      currentImage: imageData
+                    }));
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Single player image generation error:', error);
+          }
+        }, 0);
       }
     
     rooms.set(code, room);

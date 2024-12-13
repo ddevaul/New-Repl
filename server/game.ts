@@ -74,10 +74,23 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
     // In single player mode, if there's only one player and the room was just created,
     // allow the connection even if the IDs don't match exactly
     if (room.gameMode === 'single' && room.players.length === 1) {
+      // In single player mode, we're more lenient with player ID matching
       const singlePlayer = room.players[0];
-      if (Math.abs(singlePlayer.id - playerId) <= 1) {
+      console.log('Single player connection attempt:', {
+        attemptingPlayerId: playerId,
+        existingPlayerId: singlePlayer.id,
+        roomCode
+      });
+      
+      // Allow connection if it's within a reasonable window of the original ID
+      // This handles cases where the client might reconnect with a slightly different ID
+      if (Math.abs(singlePlayer.id - playerId) <= 2) {
         console.log(`Single player mode: Allowing connection for player ${playerId} in room ${roomCode}`);
         return setupSinglePlayerHandlers(ws, room, singlePlayer);
+      } else {
+        console.log('Player ID mismatch too large:', {
+          difference: Math.abs(singlePlayer.id - playerId)
+        });
       }
     }
     console.error(`Player ${playerId} attempted to connect but is not in room ${roomCode}`);
@@ -444,10 +457,22 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
   ws.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString());
-      console.log('Received single player message:', message);
+      console.log('Received single player message:', message, {
+        roomCode: room.code,
+        playerName: player.name,
+        currentRound: room.currentRound,
+        guessCount: room.guesses.length
+      });
 
       if (message.type === 'guess') {
-        if (!message.guess || !room.word) return;
+        if (!message.guess || !room.word) {
+          console.error('Invalid guess message:', { message, word: room.word });
+          ws.send(JSON.stringify({ 
+            type: 'error',
+            message: 'Invalid guess'
+          }));
+          return;
+        }
 
         // Record the guess
         room.guesses.push({
