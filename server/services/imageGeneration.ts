@@ -6,22 +6,11 @@ export async function generateImage(prompt: string): Promise<string> {
   try {
     const apiKey = process.env.STABILITY_API_KEY;
     
-    console.log('Debug - env variables:', {
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey?.length,
-      apiKeyStart: apiKey?.substring(0, 5),
-      prompt
-    });
+    console.log('Debug - Generating image with prompt:', { prompt });
 
     if (!apiKey || apiKey.trim() === '') {
       console.warn('STABILITY_API_KEY is not set or empty - using placeholder image');
       return PLACEHOLDER_IMAGE;
-    }
-
-    // Validate API key format
-    if (!apiKey.startsWith('sk-')) {
-      console.error('Invalid API key format - should start with sk-');
-      throw new Error('Invalid API key format - please check your Stability AI API key');
     }
 
     const response = await fetch(
@@ -34,11 +23,14 @@ export async function generateImage(prompt: string): Promise<string> {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          text_prompts: [{ text: prompt }],
+          text_prompts: [{ 
+            text: `A simple, clear illustration of ${prompt}. Minimalist style, clean lines, white background.`
+          }],
           cfg_scale: 7,
-          height: config.stabilityApi.imageHeight,
-          width: config.stabilityApi.imageWidth,
-          samples: config.stabilityApi.samples,
+          height: 512,
+          width: 512,
+          samples: 1,
+          style_preset: "pixel-art"
         }),
       }
     );
@@ -55,36 +47,27 @@ export async function generateImage(prompt: string): Promise<string> {
       console.error('Stability AI API error:', {
         status: response.status,
         statusText: response.statusText,
-        errorDetails,
-        endpoint: `https://api.stability.ai/v1/generation/${config.stabilityApi.engineId}/text-to-image`,
-        requestHeaders: {
-          ...response.headers,
-          Authorization: 'Bearer [REDACTED]'
-        }
+        errorDetails
       });
 
-      if (response.status === 401) {
-        throw new Error(`Authentication failed - ${errorDetails.message}`);
-      } else if (response.status === 429) {
-        throw new Error('Rate limit exceeded - please try again later');
-      } else {
-        throw new Error(`API error (${response.status}): ${errorDetails.message || 'Unknown error'}`);
-      }
+      throw new Error(`API error (${response.status}): ${errorDetails.message || 'Unknown error'}`);
     }
 
     const responseData = await response.json();
     if (!responseData.artifacts?.[0]?.base64) {
-      console.error('Invalid response format:', responseData);
       throw new Error('Received invalid response format from Stability AI');
     }
 
-    console.log('Successfully generated image');
-    return `data:image/png;base64,${responseData.artifacts[0].base64}`;
+    const imageData = Buffer.from(responseData.artifacts[0].base64, 'base64');
+    
+    // Process and store the image
+    const key = `generated/${Date.now()}-${prompt.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
+    const imageUrl = await processAndStoreImage(prompt, imageData);
+
+    console.log('Successfully generated and stored image:', { prompt, key });
+    return imageUrl;
   } catch (error) {
     console.error('Image generation failed:', error);
-    
-    // Return a placeholder image instead of throwing
-    // This allows the game to continue even if image generation fails
     return PLACEHOLDER_IMAGE;
   }
 }
