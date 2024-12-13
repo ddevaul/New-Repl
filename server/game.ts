@@ -182,7 +182,9 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             isDrawer: p.isDrawer,
             score: p.score
           })),
-          word: currentPlayer.isDrawer ? room.word : undefined
+          word: currentPlayer.isDrawer ? room.word : undefined,
+          waitingForPrompt: currentPlayer.isDrawer && !room.currentImage,
+          waitingForGuess: !currentPlayer.isDrawer && room.currentImage
         };
 
         client.send(JSON.stringify(state));

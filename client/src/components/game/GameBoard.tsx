@@ -148,9 +148,13 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
                     <span className="font-semibold">Error:</span>
                     {gameState.error}
                   </span>
+                ) : isDrawer ? (
+                  <span className="text-muted-foreground">
+                    Enter a prompt to generate an image...
+                  </span>
                 ) : (
                   <span className="text-muted-foreground">
-                    Loading image...
+                    Waiting for drawer to generate an image...
                   </span>
                 )}
               </p>
