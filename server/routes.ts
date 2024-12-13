@@ -73,14 +73,16 @@ export function registerRoutes(app: Express): Server {
     };
 
     if (gameMode === "single") {
-        room.players[0].isDrawer = true; // In single player, you're always the drawer
-        // Fetch or generate an image for single player mode
+        room.players[0].isDrawer = false; // In single player, you're the guesser
+        room.status = 'playing';
+        // Generate an AI image for the word
         try {
-          console.log('Generating image for word:', room.word);
+          console.log('Generating AI image for word:', room.word);
           const imageUrl = await generateImage(`A simple illustration of ${room.word}`);
+          console.log('Generated image URL:', imageUrl);
           room.currentImage = imageUrl;
           room.waitingForPrompt = false;
-          room.waitingForGuess = false;
+          room.waitingForGuess = true;
           console.log('Successfully set image for single player mode');
         } catch (error) {
           console.error('Failed to generate image for single player:', error);
