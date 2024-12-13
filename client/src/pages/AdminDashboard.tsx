@@ -263,6 +263,62 @@ export default function AdminDashboard() {
 
       {activeTab === 'logs' && (
         <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Activities
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{activityLogs.length}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Active Users Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {new Set(activityLogs
+                    .filter(log => new Date(log.createdAt).toDateString() === new Date().toDateString())
+                    .map(log => log.userId)).size}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Games Started Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {activityLogs.filter(log => 
+                    log.actionType === 'game_start' && 
+                    new Date(log.createdAt).toDateString() === new Date().toDateString()
+                  ).length}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Images Generated Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {activityLogs.filter(log => 
+                    log.actionType === 'image_generate' && 
+                    new Date(log.createdAt).toDateString() === new Date().toDateString()
+                  ).length}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
           <div className="flex gap-4 items-center">
             <select
               className="px-3 py-2 rounded-md border"
