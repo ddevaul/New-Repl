@@ -76,26 +76,34 @@ export function registerRoutes(app: Express): Server {
         room.players[0].isDrawer = false; // In single player, you're the guesser
         room.status = 'playing';
         // Generate an AI image for the word
+        console.log('Starting single player game image generation for word:', room.word);
         try {
-          console.log('Starting image generation for word:', room.word);
-          const imageData = await generateImage(room.word);
-          
-          if (!imageData.startsWith('data:image/png;base64,')) {
-            throw new Error('Invalid image data format received');
+          if (!room.word) {
+            console.error('No word provided for image generation');
+            room.currentImage = PLACEHOLDER_IMAGE;
+          } else {
+            console.log('Calling image generation service for word:', room.word);
+            const imageData = await generateImage(room.word);
+            
+            if (imageData === PLACEHOLDER_IMAGE) {
+              console.log('Received placeholder image from generation service');
+              room.currentImage = PLACEHOLDER_IMAGE;
+            } else if (imageData.startsWith('data:image/png;base64,')) {
+              console.log('Successfully received base64 image data');
+              room.currentImage = imageData;
+            } else {
+              console.error('Unexpected image data format:', imageData.substring(0, 100));
+              room.currentImage = PLACEHOLDER_IMAGE;
+            }
           }
-
-          console.log('Successfully generated image for word:', room.word);
-          room.currentImage = imageData;
-          room.waitingForPrompt = false;
-          room.waitingForGuess = true;
         } catch (error: any) {
-          console.error('Image generation error:', error.message);
-          // Set the current image to the placeholder and log the error
+          console.error('Single player image generation error:', error);
           room.currentImage = PLACEHOLDER_IMAGE;
-          // Still allow the game to proceed with placeholder
-          room.waitingForPrompt = false;
-          room.waitingForGuess = true;
         }
+        
+        // Always set these states regardless of image generation outcome
+        room.waitingForPrompt = false;
+        room.waitingForGuess = true;
       }
     
     rooms.set(code, room);

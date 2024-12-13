@@ -10,7 +10,7 @@ export async function generateImage(prompt: string): Promise<string> {
 
     if (!apiKey || apiKey.trim() === '') {
       console.error('STABILITY_API_KEY is not set or empty');
-      throw new Error('API key is not configured');
+      return PLACEHOLDER_IMAGE;
     }
 
     // Default to stable-diffusion-xl-1024-v1-0 if not configured
@@ -30,59 +30,71 @@ export async function generateImage(prompt: string): Promise<string> {
 
     console.log('Sending request to Stability AI:', {
       url: `https://api.stability.ai/v1/generation/${engineId}/text-to-image`,
+      apiKeyLength: apiKey.length,
       requestBody
     });
 
-    const response = await fetch(
-      `https://api.stability.ai/v1/generation/${engineId}/text-to-image`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-      }
-    );
-
-    let responseText;
     try {
-      responseText = await response.text();
-      console.log('Raw API Response:', responseText);
-    } catch (e) {
-      console.error('Failed to read response text:', e);
-      throw new Error('Failed to read API response');
-    }
+      const response = await fetch(
+        `https://api.stability.ai/v1/generation/${engineId}/text-to-image`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
 
-    if (!response.ok) {
-      console.error('Stability AI API error:', {
+      console.log('Received response from Stability AI:', {
         status: response.status,
         statusText: response.statusText,
-        responseText
+        headers: Object.fromEntries(response.headers.entries())
       });
-      throw new Error(`API error (${response.status}): ${responseText}`);
+
+      const responseText = await response.text();
+      console.log('Raw API Response:', responseText);
+
+      if (!response.ok) {
+        console.error('Stability AI API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          responseText
+        });
+        return PLACEHOLDER_IMAGE;
+      }
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse API response:', parseError);
+        return PLACEHOLDER_IMAGE;
+      }
+
+      console.log('Parsed API Response:', {
+        hasArtifacts: !!responseData.artifacts,
+        artifactsLength: responseData.artifacts?.length,
+        firstArtifactHasBase64: !!responseData.artifacts?.[0]?.base64
+      });
+
+      if (!responseData.artifacts?.[0]?.base64) {
+        console.error('Invalid response format from Stability AI');
+        return PLACEHOLDER_IMAGE;
+      }
+
+      const base64Image = responseData.artifacts[0].base64;
+      console.log('Successfully generated image');
+      
+      return `data:image/png;base64,${base64Image}`;
+    } catch (fetchError) {
+      console.error('Failed to fetch from Stability AI:', fetchError);
+      return PLACEHOLDER_IMAGE;
     }
-
-    const responseData = JSON.parse(responseText);
-    console.log('Parsed API Response:', {
-      hasArtifacts: !!responseData.artifacts,
-      artifactsLength: responseData.artifacts?.length,
-      firstArtifactHasBase64: !!responseData.artifacts?.[0]?.base64
-    });
-
-    if (!responseData.artifacts?.[0]?.base64) {
-      throw new Error('Received invalid response format from Stability AI');
-    }
-
-    const base64Image = responseData.artifacts[0].base64;
-    console.log('Successfully generated image');
-    
-    // Return the base64 image directly for immediate display
-    return `data:image/png;base64,${base64Image}`;
   } catch (error: any) {
     console.error('Image generation failed:', error.message);
-    // Re-throw the error instead of silently returning placeholder
-    throw error;
+    return PLACEHOLDER_IMAGE;
   }
 }
