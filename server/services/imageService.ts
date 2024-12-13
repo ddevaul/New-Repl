@@ -63,8 +63,16 @@ export async function generateAndStoreDefaultImages(words: string[]) {
       
       if (!existing) {
         console.log(`Generating image for word: ${word}`);
-        const aiGeneratedImageUrl = await generateAIImage(`A simple, clear illustration of ${word}`);
-        await processAndStoreImage(word, aiGeneratedImageUrl);
+        const imageData = await generateAIImage(`A simple, clear illustration of ${word}`);
+        if (imageData === PLACEHOLDER_IMAGE) {
+          console.log('Received placeholder image, skipping storage');
+          continue;
+        }
+        
+        // Convert base64 to buffer
+        const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        await processAndStoreImage(word, imageBuffer);
         console.log(`Successfully generated and stored image for: ${word}`);
         
         // Wait a bit between generations to avoid rate limits

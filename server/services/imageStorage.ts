@@ -41,9 +41,10 @@ export async function uploadImage(imageData: Buffer, key: string): Promise<strin
     console.log('Generated public URL for image:', publicUrl);
     
     return publicUrl;
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error uploading image to DigitalOcean Spaces:', error);
-    throw new Error(`Failed to upload image: ${error.message}`);
+    throw new Error(`Failed to upload image: ${errorMessage}`);
   }
 }
 
@@ -64,9 +65,10 @@ export async function getImageUrl(key: string): Promise<string> {
       console.error('Generated invalid URL:', publicUrl);
       throw new Error('Failed to generate valid image URL');
     }
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error generating public URL:', error);
-    throw new Error(`Failed to generate image URL: ${error.message}`);
+    throw new Error(`Failed to generate image URL: ${errorMessage}`);
   }
 }
 

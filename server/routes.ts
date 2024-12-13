@@ -199,9 +199,4 @@ export function registerRoutes(app: Express): Server {
   return httpServer;
 }
 
-// Placeholder for the actual image generation function.  Replace this with your implementation.
-async function generateImage(prompt: string): Promise<string> {
-  // Replace with your actual image generation logic using an API or library.
-  // This example simulates a successful image generation.
-  return `/generated_images/${prompt.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-}
+// Image generation is now handled by imageGeneration.ts
