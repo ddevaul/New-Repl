@@ -25,7 +25,7 @@ export async function generateImage(prompt: string): Promise<string> {
       height: 512,
       width: 512,
       samples: 1,
-      style_preset: "simple"
+      style_preset: "digital-art"
     };
 
     console.log('Sending request to Stability AI:', {
