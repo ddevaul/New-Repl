@@ -19,6 +19,7 @@ import {
   generateImagesForWord,
   getWordsStatus 
 } from "./services/wordManagement.js";
+import { getUserActivities, getAllActivities } from "./services/activityLogger.js";
 
 // Configure multer for image uploads
 const upload = multer({
@@ -174,5 +175,24 @@ export async function getStatus(req: Request, res: Response) {
   } catch (error) {
     console.error('Get status error:', error);
     res.status(500).send("Error getting word status");
+  }
+}
+
+// Get activity logs for all users or a specific user
+export async function getActivityLogs(req: Request, res: Response) {
+  try {
+    const { userId, limit = "50" } = req.query;
+    const parsedLimit = Math.min(parseInt(limit as string) || 50, 100);
+
+    if (userId) {
+      const logs = await getUserActivities(parseInt(userId as string), parsedLimit);
+      res.json(logs);
+    } else {
+      const logs = await getAllActivities(parsedLimit);
+      res.json(logs);
+    }
+  } catch (error) {
+    console.error('Get activity logs error:', error);
+    res.status(500).send("Error fetching activity logs");
   }
 }

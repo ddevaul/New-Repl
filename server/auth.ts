@@ -13,6 +13,7 @@ import jwt from "jsonwebtoken";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+import { logActivity } from "./services/activityLogger.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -90,6 +91,11 @@ export async function login(req: Request, res: Response) {
     }
 
     console.log('Login successful for user:', email);
+    await logActivity({
+      userId: user.id,
+      actionType: 'login',
+      details: { email: user.email }
+    });
 
     // Generate JWT with isAdmin flag
     const token = jwt.sign({ 

@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { signup, login, authMiddleware, checkGameLimit } from "./auth.js";
-import { isAdmin, getAllUsers, updateUserGamesLimit, addWord, uploadImage, generateImages, getStatus } from "./admin.js";
+import { isAdmin, getAllUsers, updateUserGamesLimit, addWord, uploadImage, generateImages, getStatus, getActivityLogs } from "./admin.js";
 import { 
   rooms, 
   type Room, 
@@ -27,6 +27,7 @@ export function registerRoutes(app: Express): Server {
   // Admin routes
   app.get("/api/admin/users", authMiddleware, isAdmin, getAllUsers);
   app.put("/api/admin/users/:userId/games-limit", authMiddleware, isAdmin, updateUserGamesLimit);
+  app.get("/api/admin/activity-logs", authMiddleware, isAdmin, getActivityLogs);
   
   // Word and image management routes (admin only)
   app.post("/api/admin/words", authMiddleware, isAdmin, addWord);

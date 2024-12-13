@@ -33,7 +33,8 @@ export default function AdminDashboard() {
   const [words, setWords] = useState<WordStatus[]>([]);
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'words'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'words' | 'logs'>('users');
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,6 +65,14 @@ export default function AdminDashboard() {
         }
         const wordsData = await wordsResponse.json();
         setWords(wordsData);
+
+        // Fetch activity logs
+        const logsResponse = await fetch('/api/admin/activity-logs', { headers });
+        if (!logsResponse.ok) {
+          throw new Error('Failed to fetch activity logs');
+        }
+        const logsData = await logsResponse.json();
+        setActivityLogs(logsData);
       } catch (error) {
         toast({
           title: "Error",
@@ -131,6 +140,12 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab('words')}
           >
             Word Management
+          </Button>
+          <Button
+            variant={activeTab === 'logs' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('logs')}
+          >
+            Activity Logs
           </Button>
         </div>
       </div>
@@ -238,6 +253,35 @@ export default function AdminDashboard() {
                         Generate Images
                       </Button>
                     </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {activeTab === 'logs' && (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Time</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {activityLogs.map((log) => (
+                <TableRow key={log.id}>
+                  <TableCell>{log.user?.name || 'Unknown'}</TableCell>
+                  <TableCell>{log.actionType}</TableCell>
+                  <TableCell>
+                    {log.details ? JSON.stringify(log.details) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(log.createdAt).toLocaleString()}
                   </TableCell>
                 </TableRow>
               ))}
