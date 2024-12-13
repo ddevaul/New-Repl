@@ -432,6 +432,35 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
     const connections = roomConnections.get(room.code)!;
     connections.set(player.id, ws);
 
+    // Function to start a new round
+    async function startNewRound() {
+      console.log('Starting new round:', {
+        roomCode: room.code,
+        currentRound: room.currentRound,
+        previousWord: room.word
+      });
+
+      room.word = getRandomWord();
+      room.guesses = [];
+      room.currentRound += 1;
+      room.waitingForGuess = true;
+      room.waitingForPrompt = false;
+
+      console.log('Generated new word:', room.word);
+      
+      try {
+        const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+        console.log('Generating image with prompt:', prompt);
+        room.currentImage = await generateImage(prompt);
+        console.log('Successfully generated new image for word:', room.word);
+      } catch (error) {
+        console.error('Failed to generate image for new round:', error);
+        room.currentImage = PLACEHOLDER_IMAGE;
+      }
+      
+      sendGameState();
+    }
+
     // Function to send game state to the player
     function sendGameState() {
       if (!room) return;
@@ -449,13 +478,15 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
         waitingForPrompt: false,
         waitingForGuess: true,
         attemptsLeft,
-        currentRound: room.currentRound
+        currentRound: room.currentRound,
+        currentImage: room.currentImage
       };
 
       console.log(`Sending single player game state to ${player.name}:`, {
         attemptsLeft,
         currentRound: room.currentRound,
-        guessCount: room.guesses?.length
+        guessCount: room.guesses?.length,
+        hasImage: !!room.currentImage
       });
       ws.send(JSON.stringify(state));
     }
@@ -520,20 +551,12 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
                 message: `Game Over! Final score: ${player.score} points`
               }));
               room.status = 'ended';
+              sendGameState();
             } else {
-              // Start new round
-              room.word = getRandomWord();
-              room.guesses = [];
-              room.currentRound += 1;
-            
-              // Generate new image for the next word
-              try {
-                const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
-                room.currentImage = await generateImage(prompt);
-              } catch (error) {
-                console.error('Failed to generate image for new round:', error);
-                room.currentImage = PLACEHOLDER_IMAGE;
-              }
+              // Start new round with delay to ensure messages are received in order
+              setTimeout(async () => {
+                await startNewRound();
+              }, 1000);
             }
           } else if (!hasAttemptsLeft) {
             // No more attempts left
@@ -549,20 +572,12 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
                 message: `Game Over! Final score: ${player.score} points`
               }));
               room.status = 'ended';
+              sendGameState();
             } else {
-              // Start new round
-              room.word = getRandomWord();
-              room.guesses = [];
-              room.currentRound += 1;
-            
-              // Generate new image for the next word
-              try {
-                const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
-                room.currentImage = await generateImage(prompt);
-              } catch (error) {
-                console.error('Failed to generate image for new round:', error);
-                room.currentImage = PLACEHOLDER_IMAGE;
-              }
+              // Start new round with delay to ensure messages are received in order
+              setTimeout(async () => {
+                await startNewRound();
+              }, 1000);
             }
           } else {
             // Wrong guess but has attempts left
