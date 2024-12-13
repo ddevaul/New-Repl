@@ -49,11 +49,32 @@ export async function generateImage(prompt: string): Promise<string> {
       prompt: requestBody.text_prompts[0].text
     });
 
+    // Test API key validity first
+    try {
+      const balanceResponse = await fetch('https://api.stability.ai/v1/user/balance', {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!balanceResponse.ok) {
+        console.error('Invalid API key or API access error:', await balanceResponse.text());
+        return PLACEHOLDER_IMAGE;
+      }
+
+      console.log('API key validated successfully');
+    } catch (balanceError: any) {
+      console.error('Failed to validate API key:', balanceError);
+      return PLACEHOLDER_IMAGE;
+    }
+
     // Make the API request with detailed error handling
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
+      console.log('Sending request to Stability AI...');
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -78,7 +99,8 @@ export async function generateImage(prompt: string): Promise<string> {
       console.log('Response body preview:', responseText.substring(0, 200) + '...');
 
       if (!response.ok) {
-        throw new Error(`API error (${response.status}): ${responseText}`);
+        console.error('API error response:', responseText);
+        return PLACEHOLDER_IMAGE;
       }
 
       // Try to parse the response as JSON
@@ -87,19 +109,19 @@ export async function generateImage(prompt: string): Promise<string> {
         responseData = JSON.parse(responseText);
       } catch (parseError) {
         console.error('JSON Parse Error:', parseError);
-        throw new Error('Failed to parse API response as JSON');
+        return PLACEHOLDER_IMAGE;
       }
 
       // Validate the response structure
       if (!responseData.artifacts || !Array.isArray(responseData.artifacts)) {
         console.error('Invalid response structure:', responseData);
-        throw new Error('API response missing artifacts array');
+        return PLACEHOLDER_IMAGE;
       }
 
       const firstArtifact = responseData.artifacts[0];
       if (!firstArtifact || !firstArtifact.base64) {
         console.error('Invalid artifact structure:', firstArtifact);
-        throw new Error('API response missing base64 image data');
+        return PLACEHOLDER_IMAGE;
       }
 
       console.log('Successfully processed API response:', {
@@ -117,7 +139,7 @@ export async function generateImage(prompt: string): Promise<string> {
         cause: fetchError.cause,
         stack: fetchError.stack
       });
-      throw new Error(`Failed to generate image: ${fetchError.message}`);
+      return PLACEHOLDER_IMAGE;
     }
   } catch (error: any) {
     console.error('Image Generation Error:', {
