@@ -202,30 +202,41 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
         case 'prompt':
           if (!room.word) break;
           
-          // In single player mode, AI generates the image automatically
-          if (room.gameMode !== 'single') {
-            const drawer = room.players.find(p => p.isDrawer);
-            if (!drawer || drawer.id !== playerId) {
-              ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
-              break;
-            }
-          }
-
           try {
-            console.log('Generating images for prompt:', message.prompt);
+            // In multiplayer mode, verify drawer permissions
+            if (room.gameMode !== 'single') {
+              const drawer = room.players.find(p => p.isDrawer);
+              if (!drawer || drawer.id !== playerId) {
+                ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
+                break;
+              }
+            }
+
+            console.log('Generating images for word:', room.word);
             const images = await getOrGenerateImages(room.word);
             
             if (!images || images.length === 0) {
               throw new Error('No images generated');
             }
             
+            console.log(`Successfully generated ${images.length} images for word:`, room.word);
+            
+            room.drawerPrompts.push(message.prompt || '');
             room.availableImages = images;
             room.currentImage = images[0];
             room.waitingForGuess = true;
             room.waitingForPrompt = false;
+            room.error = undefined;
             
-            console.log(`Generated ${images.length} images for word:`, room.word);
             broadcastGameState();
+            
+            // Notify about successful image generation
+            if (room.gameMode !== 'single') {
+              ws.send(JSON.stringify({
+                type: 'imageGenerated',
+                message: 'Image generated successfully'
+              }));
+            }
           } catch (error) {
             console.error('Error generating images:', error);
             ws.send(JSON.stringify({ 
@@ -440,11 +451,7 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
       const message = JSON.parse(data.toString());
       
       if (message.type === 'guess') {
-        if (!message.guess || !room.word) {
-          ws.send(JSON.stringify({ error: 'Invalid guess' }));
-          return;
-        }
-
+        // Add the guess to the list
         room.guesses.push({
           text: message.guess,
           player: player.name,
