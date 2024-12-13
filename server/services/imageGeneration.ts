@@ -62,10 +62,15 @@ export async function generateImage(prompt: string): Promise<string> {
     
     // Process and store the image
     const key = `generated/${Date.now()}-${prompt.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
-    const imageUrl = await processAndStoreImage(prompt, imageData);
-
-    console.log('Successfully generated and stored image:', { prompt, key });
-    return imageUrl;
+    try {
+      const imageUrl = await processAndStoreImage(prompt, imageData);
+      console.log('Successfully generated and stored image:', { prompt, key, imageUrl });
+      return imageUrl;
+    } catch (storageError) {
+      console.error('Failed to store generated image:', storageError);
+      // Return base64 image data as fallback
+      return `data:image/png;base64,${responseData.artifacts[0].base64}`;
+    }
   } catch (error) {
     console.error('Image generation failed:', error);
     return PLACEHOLDER_IMAGE;

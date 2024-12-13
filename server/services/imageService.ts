@@ -8,8 +8,13 @@ import { eq } from "drizzle-orm";
 // Function to process and store an AI-generated image
 export async function processAndStoreImage(word: string, imageBuffer: Buffer): Promise<string> {
   try {
-    console.log(`Processing image for word: ${word}`);
+    console.log(`Starting image processing for word: ${word}`);
     
+    if (!imageBuffer || imageBuffer.length === 0) {
+      throw new Error('Invalid image buffer received');
+    }
+    
+    console.log('Processing image with Sharp...');
     // Process the image with sharp (resize, optimize, etc.)
     const processedImage = await sharp(imageBuffer)
       .resize(512, 512, {
@@ -19,9 +24,11 @@ export async function processAndStoreImage(word: string, imageBuffer: Buffer): P
       .png({ quality: 90, compressionLevel: 9 })
       .toBuffer();
     
+    console.log('Image processed successfully, uploading to DigitalOcean Spaces...');
     // Upload to DigitalOcean Spaces
     const key = `generated/${word.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}.png`;
     const storedImageUrl = await uploadImage(processedImage, key);
+    console.log('Image uploaded successfully:', { key, url: storedImageUrl });
     
     // Store in database
     await db.insert(preGeneratedImages).values({
