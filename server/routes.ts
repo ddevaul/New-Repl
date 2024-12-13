@@ -101,7 +101,7 @@ export function registerRoutes(app: Express): Server {
         room.drawerPrompts = [];       // No prompts needed in single player
         room.attemptsLeft = 3;         // Player gets 3 attempts to guess
 
-        // Fetch pre-generated image immediately
+        // Get or generate an image for the word
         try {
           if (!room.word) {
             console.error('No word provided for single player game');
@@ -110,22 +110,25 @@ export function registerRoutes(app: Express): Server {
           
           console.log('Starting single player game for word:', room.word);
           
-          // Get pre-generated images
+          // Try to get pre-generated image first
           const preGenerated = await db.query.preGeneratedImages.findMany({
             where: eq(preGeneratedImages.word, room.word.toLowerCase())
           });
 
-          if (!preGenerated || preGenerated.length === 0) {
-            console.error('No pre-generated images found for word:', room.word);
-            throw new Error(`No pre-generated images found for word: ${room.word}`);
+          if (preGenerated && preGenerated.length > 0) {
+            // Use a pre-generated image if available
+            const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
+            console.log(`Using pre-generated image ${randomImage.id} for word:`, room.word);
+            room.currentImage = randomImage.imageUrl;
+          } else {
+            // Generate a new image if none exists
+            console.log('No pre-generated images found, generating new one for:', room.word);
+            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+            const imageUrl = await generateImage(prompt);
+            room.currentImage = imageUrl;
           }
-
-          // Randomly select one of the pre-generated images
-          const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
-          console.log(`Selected image ${randomImage.id} from ${preGenerated.length} pre-generated images for word:`, room.word);
-          room.currentImage = randomImage.imageUrl;
           
-          console.log('Successfully initialized single player game with pre-generated image');
+          console.log('Successfully initialized single player game with image');
         } catch (error) {
           console.error('Single player initialization error:', error);
           room.currentImage = PLACEHOLDER_IMAGE;

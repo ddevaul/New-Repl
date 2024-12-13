@@ -467,56 +467,41 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
 
     // Function to start a new round
     async function startNewRound() {
-      let attempts = 0;
-      const maxAttempts = 5;
+      room.word = getRandomWord();
+      console.log('Starting new round with word:', room.word);
       
-      // Keep trying until we find a word with exactly 3 images
-      while (attempts < maxAttempts) {
-        room.word = getRandomWord();
-        console.log(`Attempt ${attempts + 1}: Checking word "${room.word}" for images`);
-        
-        try {
-          const preGenerated = await db.query.preGeneratedImages.findMany({
-            where: eq(preGeneratedImages.word, room.word.toLowerCase())
-          });
+      try {
+        // Try to get pre-generated image first
+        const preGenerated = await db.query.preGeneratedImages.findMany({
+          where: eq(preGeneratedImages.word, room.word.toLowerCase())
+        });
 
-          if (preGenerated && preGenerated.length === 3) {
-            // Found a word with exactly 3 images
-            room.availableImages = preGenerated.map(img => img.imageUrl);
-            room.shownImages = new Set();
-            
-            // Randomly select first image to show
-            const firstImage = room.availableImages[Math.floor(Math.random() * 3)];
-            room.shownImages.add(firstImage);
-            
-            // Set up the new round
-            room.guesses = [];
-            room.currentRound += 1;
-            room.waitingForGuess = true;
-            room.waitingForPrompt = false;
-            room.currentImage = firstImage;
-            room.attemptsLeft = 3;
-            
-            console.log('Successfully started new round:', {
-              word: room.word,
-              totalImages: room.availableImages.length,
-              currentImage: room.currentImage
-            });
-            return; // Successfully found a word with 3 images
-          } else if (preGenerated && preGenerated.length > 0) {
-            console.log(`Found ${preGenerated.length} images for "${room.word}", need exactly 3`);
-          }
-        } catch (error) {
-          console.error(`Error checking images for word "${room.word}":`, error);
+        // Set up the new round
+        room.guesses = [];
+        room.currentRound += 1;
+        room.waitingForGuess = true;
+        room.waitingForPrompt = false;
+        room.attemptsLeft = 3;
+
+        if (preGenerated && preGenerated.length > 0) {
+          // Use a pre-generated image
+          const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
+          room.currentImage = randomImage.imageUrl;
+          console.log('Using pre-generated image for word:', room.word);
+        } else {
+          // Generate new image
+          console.log('Generating new image for word:', room.word);
+          const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+          const imageUrl = await generateImage(prompt);
+          room.currentImage = imageUrl;
         }
         
-        attempts++;
+        console.log('Successfully started new round with image');
+      } catch (error) {
+        console.error('Error starting new round:', error);
+        room.error = 'Could not load the next round. Please try again later.';
+        room.currentImage = PLACEHOLDER_IMAGE;
       }
-      
-      // If we couldn't find a word with exactly 3 images
-      console.error('Could not find a word with exactly 3 images after multiple attempts');
-      room.error = 'Could not load the next round. Please try again later.';
-      room.currentImage = PLACEHOLDER_IMAGE;
       
       sendGameState();
     }
