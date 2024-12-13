@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { uploadImage, getImageUrl } from './imageStorage.js';
-import { generateImage as generateAIImage } from './imageGeneration.js';
+import { generateImage as generateAIImage, PLACEHOLDER_IMAGE } from './imageGeneration.js';
 import { db } from "../../db/index.js";
 import { preGeneratedImages } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
