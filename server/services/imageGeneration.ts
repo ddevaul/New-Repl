@@ -10,10 +10,10 @@ export async function generateImage(prompt: string): Promise<string> {
     console.log('Starting image generation with prompt:', { prompt });
 
     if (!apiKey || apiKey.trim() === '') {
-        throw new Error('STABILITY_API_KEY is not set or empty');
-      }
+      throw new Error('STABILITY_API_KEY is not set or empty');
+    }
 
-      console.log('Verifying API key configuration...');
+    console.log('Verifying API key configuration...');
 
     // Default to stable-diffusion-xl-1024-v1-0 if not configured
     const engineId = 'stable-diffusion-xl-1024-v1-0';
@@ -30,11 +30,12 @@ export async function generateImage(prompt: string): Promise<string> {
         weight: 1
       }],
       cfg_scale: 7,
-      height: 1024,
-      width: 1024,
+      height: 512,
+      width: 512,
       samples: 1,
-      steps: 30,
-      style_preset: "digital-art"
+      steps: 50,
+      style_preset: "photographic",
+      sampler: "K_EULER"
     };
 
     console.log('Preparing Stability AI request:', {
@@ -103,7 +104,16 @@ export async function generateImage(prompt: string): Promise<string> {
       let responseData;
       try {
         responseData = JSON.parse(responseText);
-      } catch (parseError) {
+        console.log('API Response structure:', {
+          hasArtifacts: !!responseData.artifacts,
+          artifactsLength: responseData.artifacts?.length,
+          firstArtifact: responseData.artifacts?.[0] ? {
+            hasBase64: !!responseData.artifacts[0].base64,
+            finishReason: responseData.artifacts[0].finishReason,
+            seed: responseData.artifacts[0].seed
+          } : null
+        });
+      } catch (parseError: any) {
         console.error('JSON Parse Error:', parseError);
         throw new Error(`JSON parsing failed: ${parseError.message}`);
       }
@@ -133,9 +143,13 @@ export async function generateImage(prompt: string): Promise<string> {
       });
 
       // Return proper data URL format for PNG image
-      const imageUrl = `data:image/png;base64,${base64Data}`;
-      console.log('Generated image URL length:', imageUrl.length);
-      return imageUrl;
+      if (!base64Data.startsWith('data:image/')) {
+        const imageUrl = `data:image/png;base64,${base64Data}`;
+        console.log('Generated image URL length:', imageUrl.length);
+        return imageUrl;
+      }
+      console.log('Image data already contains data URL prefix, returning as is');
+      return base64Data;
 
     } catch (fetchError: any) {
       console.error('Stability AI API Error:', {
