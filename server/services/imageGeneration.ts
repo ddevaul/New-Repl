@@ -60,21 +60,8 @@ export async function generateImage(prompt: string): Promise<string> {
 
     const imageData = Buffer.from(responseData.artifacts[0].base64, 'base64');
     
-    // Process and store the image
-    try {
-      // Convert base64 to buffer
-      const imageBuffer = Buffer.from(responseData.artifacts[0].base64, 'base64');
-      const key = `generated/${Date.now()}-${prompt.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
-      console.log('Attempting to process and store image with key:', key);
-      
-      const imageUrl = await processAndStoreImage(prompt, imageBuffer);
-      console.log('Successfully generated and stored image:', { prompt, key, imageUrl });
-      return imageUrl;
-    } catch (storageError) {
-      console.error('Failed to store generated image:', storageError);
-      // Return base64 image data as fallback
-      return `data:image/png;base64,${responseData.artifacts[0].base64}`;
-    }
+    // Return the base64 image directly for immediate display
+    return `data:image/png;base64,${responseData.artifacts[0].base64}`;
   } catch (error) {
     console.error('Image generation failed:', error);
     return PLACEHOLDER_IMAGE;

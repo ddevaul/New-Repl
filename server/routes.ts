@@ -78,12 +78,16 @@ export function registerRoutes(app: Express): Server {
         // Generate an AI image for the word
         try {
           console.log('Generating AI image for word:', room.word);
-          const imageUrl = await generateImage(`A simple illustration of ${room.word}`);
-          console.log('Generated image URL:', imageUrl);
-          room.currentImage = imageUrl;
-          room.waitingForPrompt = false;
-          room.waitingForGuess = true;
-          console.log('Successfully set image for single player mode');
+          const imageData = await generateImage(`A simple illustration of ${room.word}`);
+          if (imageData.startsWith('data:image')) {
+            console.log('Successfully generated base64 image');
+            room.currentImage = imageData;
+            room.waitingForPrompt = false;
+            room.waitingForGuess = true;
+          } else {
+            console.error('Invalid image data received');
+            room.currentImage = PLACEHOLDER_IMAGE;
+          }
         } catch (error) {
           console.error('Failed to generate image for single player:', error);
           room.currentImage = PLACEHOLDER_IMAGE;
