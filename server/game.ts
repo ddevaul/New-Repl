@@ -179,8 +179,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             score: p.score
           })),
           word: currentPlayer.isDrawer ? room.word : undefined,
-          waitingForPrompt: currentPlayer.isDrawer && !room.currentImage,
-          waitingForGuess: !currentPlayer.isDrawer && room.currentImage
+          waitingForPrompt: currentPlayer.isDrawer && !room.currentImage && !room.availableImages,
+          waitingForGuess: !currentPlayer.isDrawer && !!room.currentImage
         };
 
         client.send(JSON.stringify(state));
@@ -195,26 +195,35 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
       switch (message.type) {
         case 'prompt':
+          console.log('Processing prompt message:', {
+            roomCode,
+            playerId,
+            isDrawer: connectingPlayer.isDrawer,
+            gameMode: room.gameMode,
+            currentWord: room.word
+          });
+
           if (!room.word) {
             console.error('No word set for room:', roomCode);
             ws.send(JSON.stringify({ error: 'No word set for room' }));
             break;
           }
-          
+
+          // Validate drawer permissions in multiplayer mode
+          if (room.gameMode !== 'single' && !connectingPlayer.isDrawer) {
+            console.error('Non-drawer attempted to generate image:', playerId);
+            ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
+            break;
+          }
+
+          // Prevent duplicate image generation
+          if (room.currentImage) {
+            console.log('Images already generated for current word:', room.word);
+            ws.send(JSON.stringify({ error: 'Images already generated for this word' }));
+            break;
+          }
+
           try {
-            console.log('Processing prompt message:', {
-              roomCode,
-              playerId,
-              isDrawer: connectingPlayer.isDrawer,
-              gameMode: room.gameMode
-            });
-
-            if (room.gameMode !== 'single' && !connectingPlayer.isDrawer) {
-              console.error('Non-drawer attempted to generate image:', playerId);
-              ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
-              break;
-            }
-
             console.log('Starting image generation for word:', room.word);
             const images = await getOrGenerateImages(room.word);
             
