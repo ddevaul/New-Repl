@@ -77,20 +77,24 @@ export function registerRoutes(app: Express): Server {
         room.status = 'playing';
         // Generate an AI image for the word
         try {
-          console.log('Generating AI image for word:', room.word);
-          const imageData = await generateImage(`A simple illustration of ${room.word}`);
-          if (imageData.startsWith('data:image')) {
-            console.log('Successfully generated base64 image');
-            room.currentImage = imageData;
-            room.waitingForPrompt = false;
-            room.waitingForGuess = true;
-          } else {
-            console.error('Invalid image data received');
-            room.currentImage = PLACEHOLDER_IMAGE;
+          console.log('Starting image generation for word:', room.word);
+          const imageData = await generateImage(room.word);
+          
+          if (!imageData.startsWith('data:image/png;base64,')) {
+            throw new Error('Invalid image data format received');
           }
-        } catch (error) {
-          console.error('Failed to generate image for single player:', error);
+
+          console.log('Successfully generated image for word:', room.word);
+          room.currentImage = imageData;
+          room.waitingForPrompt = false;
+          room.waitingForGuess = true;
+        } catch (error: any) {
+          console.error('Image generation error:', error.message);
+          // Set the current image to the placeholder and log the error
           room.currentImage = PLACEHOLDER_IMAGE;
+          // Still allow the game to proceed with placeholder
+          room.waitingForPrompt = false;
+          room.waitingForGuess = true;
         }
       }
     

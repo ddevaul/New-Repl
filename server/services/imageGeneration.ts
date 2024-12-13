@@ -6,15 +6,35 @@ export async function generateImage(prompt: string): Promise<string> {
   try {
     const apiKey = process.env.STABILITY_API_KEY;
     
-    console.log('Debug - Generating image with prompt:', { prompt });
+    console.log('Starting image generation with prompt:', { prompt });
 
     if (!apiKey || apiKey.trim() === '') {
-      console.warn('STABILITY_API_KEY is not set or empty - using placeholder image');
-      return PLACEHOLDER_IMAGE;
+      console.error('STABILITY_API_KEY is not set or empty');
+      throw new Error('API key is not configured');
     }
 
+    // Default to stable-diffusion-xl-1024-v1-0 if not configured
+    const engineId = 'stable-diffusion-xl-1024-v1-0';
+    console.log('Using Stability AI engine:', engineId);
+
+    const requestBody = {
+      text_prompts: [{ 
+        text: `A simple, clear illustration of ${prompt}. Minimalist style, clean lines, white background.`
+      }],
+      cfg_scale: 7,
+      height: 512,
+      width: 512,
+      samples: 1,
+      style_preset: "simple"
+    };
+
+    console.log('Sending request to Stability AI:', {
+      url: `https://api.stability.ai/v1/generation/${engineId}/text-to-image`,
+      requestBody
+    });
+
     const response = await fetch(
-      `https://api.stability.ai/v1/generation/${config.stabilityApi.engineId}/text-to-image`,
+      `https://api.stability.ai/v1/generation/${engineId}/text-to-image`,
       {
         method: 'POST',
         headers: {
@@ -22,48 +42,47 @@ export async function generateImage(prompt: string): Promise<string> {
           Accept: 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          text_prompts: [{ 
-            text: `A simple, clear illustration of ${prompt}. Minimalist style, clean lines, white background.`
-          }],
-          cfg_scale: 7,
-          height: 512,
-          width: 512,
-          samples: 1,
-          style_preset: "pixel-art"
-        }),
+        body: JSON.stringify(requestBody),
       }
     );
 
-    if (!response.ok) {
-      let errorDetails;
-      try {
-        const errorText = await response.text();
-        errorDetails = JSON.parse(errorText);
-      } catch (e) {
-        errorDetails = { message: response.statusText };
-      }
+    let responseText;
+    try {
+      responseText = await response.text();
+      console.log('Raw API Response:', responseText);
+    } catch (e) {
+      console.error('Failed to read response text:', e);
+      throw new Error('Failed to read API response');
+    }
 
+    if (!response.ok) {
       console.error('Stability AI API error:', {
         status: response.status,
         statusText: response.statusText,
-        errorDetails
+        responseText
       });
-
-      throw new Error(`API error (${response.status}): ${errorDetails.message || 'Unknown error'}`);
+      throw new Error(`API error (${response.status}): ${responseText}`);
     }
 
-    const responseData = await response.json();
+    const responseData = JSON.parse(responseText);
+    console.log('Parsed API Response:', {
+      hasArtifacts: !!responseData.artifacts,
+      artifactsLength: responseData.artifacts?.length,
+      firstArtifactHasBase64: !!responseData.artifacts?.[0]?.base64
+    });
+
     if (!responseData.artifacts?.[0]?.base64) {
       throw new Error('Received invalid response format from Stability AI');
     }
 
-    const imageData = Buffer.from(responseData.artifacts[0].base64, 'base64');
+    const base64Image = responseData.artifacts[0].base64;
+    console.log('Successfully generated image');
     
     // Return the base64 image directly for immediate display
-    return `data:image/png;base64,${responseData.artifacts[0].base64}`;
-  } catch (error) {
-    console.error('Image generation failed:', error);
-    return PLACEHOLDER_IMAGE;
+    return `data:image/png;base64,${base64Image}`;
+  } catch (error: any) {
+    console.error('Image generation failed:', error.message);
+    // Re-throw the error instead of silently returning placeholder
+    throw error;
   }
 }
