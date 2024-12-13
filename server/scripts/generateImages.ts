@@ -13,8 +13,14 @@ async function main() {
     // Generate images for a specific category
     console.log(`Generating images for category: ${category}`);
     const words = PICTIONARY_WORDS[category as keyof typeof PICTIONARY_WORDS];
-    for (const word of words) {
+    console.log(`Starting generation for ${words.length} words in category ${category}:`);
+    console.log(words.join(', '));
+    
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      console.log(`\n[${i + 1}/${words.length}] Generating images for "${word}"...`);
       await generateAndStoreImagesForWord(word);
+      console.log(`Completed generation for "${word}"\n`);
     }
   } else {
     // Generate all images

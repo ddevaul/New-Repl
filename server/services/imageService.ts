@@ -33,13 +33,10 @@ export async function processAndStoreImage(word: string, imageBuffer: Buffer): P
     const storedImageUrl = await uploadImage(processedImage, key);
     console.log('Image uploaded successfully:', { key, url: storedImageUrl });
     
-    // Store in database
+    // Store in database - allow multiple images per word
     await db.insert(preGeneratedImages).values({
-      word,
+      word: word.toLowerCase(),
       imageUrl: storedImageUrl
-    }).onConflictDoUpdate({
-      target: preGeneratedImages.word,
-      set: { imageUrl: storedImageUrl }
     });
     
     console.log(`Successfully stored image for word: ${word}`);

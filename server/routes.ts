@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { signup, login, authMiddleware, checkGameLimit } from "./auth.js";
-import { isAdmin, getAllUsers, updateUserGamesLimit } from "./admin.js";
+import { isAdmin, getAllUsers, updateUserGamesLimit, addWord, uploadImage, generateImages, getStatus } from "./admin.js";
 import { 
   rooms, 
   type Room, 
@@ -27,6 +27,12 @@ export function registerRoutes(app: Express): Server {
   // Admin routes
   app.get("/api/admin/users", authMiddleware, isAdmin, getAllUsers);
   app.put("/api/admin/users/:userId/games-limit", authMiddleware, isAdmin, updateUserGamesLimit);
+  
+  // Word and image management routes (admin only)
+  app.post("/api/admin/words", authMiddleware, isAdmin, addWord);
+  app.post("/api/admin/words/:word/images", authMiddleware, isAdmin, uploadImage);
+  app.post("/api/admin/words/:word/generate", authMiddleware, isAdmin, generateImages);
+  app.get("/api/admin/words/status", authMiddleware, isAdmin, getStatus);
 
   // Get leaderboard
   app.get("/api/leaderboard", async (req, res) => {
@@ -94,15 +100,17 @@ export function registerRoutes(app: Express): Server {
           
           console.log('Starting single player game image generation for word:', room.word);
           try {
-            // First try to find a pre-generated image
-            const preGenerated = await db.query.preGeneratedImages.findFirst({
+            // First try to find pre-generated images
+            const preGenerated = await db.query.preGeneratedImages.findMany({
               where: eq(preGeneratedImages.word, room.word.toLowerCase())
             });
 
             let imageData;
-            if (preGenerated) {
-              console.log('Found pre-generated image for word:', room.word);
-              imageData = preGenerated.imageUrl;
+            if (preGenerated && preGenerated.length > 0) {
+              // Randomly select one of the pre-generated images
+              const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
+              console.log(`Found ${preGenerated.length} pre-generated images for word:`, room.word);
+              imageData = randomImage.imageUrl;
             } else {
               console.log('No pre-generated image found, generating new one for:', room.word);
               const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
