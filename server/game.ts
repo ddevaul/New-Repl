@@ -41,6 +41,7 @@ export type Room = {
   attemptsLeft: number;
   waitingForGuess: boolean;
   waitingForPrompt: boolean;
+  gameMode: 'single' | 'multi';
 };
 
 // Keep track of WebSocket connections for each room
@@ -70,6 +71,15 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
   // Find the connecting player in the room
   const connectingPlayer = room.players.find(p => p.id === playerId);
   if (!connectingPlayer) {
+    // In single player mode, if there's only one player and the room was just created,
+    // allow the connection even if the IDs don't match exactly
+    if (room.gameMode === 'single' && room.players.length === 1) {
+      const singlePlayer = room.players[0];
+      if (Math.abs(singlePlayer.id - playerId) <= 1) {
+        console.log(`Single player mode: Allowing connection for player ${playerId} in room ${roomCode}`);
+        return setupSinglePlayerHandlers(ws, room, singlePlayer);
+      }
+    }
     console.error(`Player ${playerId} attempted to connect but is not in room ${roomCode}`);
     ws.send(JSON.stringify({ error: 'You are not a member of this room' }));
     ws.close();
@@ -397,4 +407,134 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
       broadcastGameState();
     }
   });
+}
+// Single player specific game handlers
+function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
+  console.log(`Setting up single player handlers for player ${player.name} in room ${room.code}`);
+  
+  // Initialize connections for the room if they don't exist
+  if (!roomConnections.has(room.code)) {
+    roomConnections.set(room.code, new Map());
+  }
+  const connections = roomConnections.get(room.code)!;
+  connections.set(player.id, ws);
+
+  // Function to send game state to the player
+  function sendGameState() {
+    if (!room) return;
+    
+    const state = {
+      ...room,
+      players: room.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        isDrawer: p.isDrawer,
+        score: p.score
+      })),
+      word: undefined, // Never send the word to the player in single player mode
+      waitingForPrompt: false,
+      waitingForGuess: true
+    };
+
+    console.log(`Sending single player game state to ${player.name}`);
+    ws.send(JSON.stringify(state));
+  }
+
+  // Handle incoming messages
+  ws.on('message', async (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      console.log('Received single player message:', message);
+
+      if (message.type === 'guess') {
+        if (!message.guess || !room.word) return;
+
+        // Record the guess
+        room.guesses.push({
+          text: message.guess,
+          player: player.name,
+          timestamp: new Date().toISOString()
+        });
+
+        // Check if guess is correct
+        const isCorrect = message.guess.toLowerCase() === room.word.toLowerCase();
+        const attemptsUsed = room.guesses.length;
+        const hasAttemptsLeft = attemptsUsed < 3;
+
+        if (isCorrect) {
+          // Update score based on attempts used
+          const scoreForThisRound = Math.max(10 - (attemptsUsed - 1) * 3, 1); // 10, 7, 4 points based on attempts
+          player.score += scoreForThisRound;
+
+          // Send success message
+          ws.send(JSON.stringify({
+            type: 'roundComplete',
+            message: `Correct! You got "${room.word}" in ${attemptsUsed} ${attemptsUsed === 1 ? 'try' : 'tries'}! +${scoreForThisRound} points`
+          }));
+
+          // Start new round
+          room.word = getRandomWord();
+          room.guesses = [];
+          room.currentRound += 1;
+          
+          // Generate new image for the next word
+          try {
+            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+            room.currentImage = await generateImage(prompt);
+          } catch (error) {
+            console.error('Failed to generate image for new round:', error);
+            room.currentImage = PLACEHOLDER_IMAGE;
+          }
+        } else if (!hasAttemptsLeft) {
+          // No more attempts left
+          ws.send(JSON.stringify({
+            type: 'roundComplete',
+            message: `Out of attempts! The word was "${room.word}". Starting new round...`
+          }));
+
+          // Start new round
+          room.word = getRandomWord();
+          room.guesses = [];
+          room.currentRound += 1;
+          
+          // Generate new image for the next word
+          try {
+            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
+            room.currentImage = await generateImage(prompt);
+          } catch (error) {
+            console.error('Failed to generate image for new round:', error);
+            room.currentImage = PLACEHOLDER_IMAGE;
+          }
+        } else {
+          // Wrong guess but has attempts left
+          ws.send(JSON.stringify({
+            type: 'wrongGuess',
+            message: `Wrong guess! You have ${3 - attemptsUsed} ${3 - attemptsUsed === 1 ? 'try' : 'tries'} left.`
+          }));
+        }
+
+        // Send updated game state
+        sendGameState();
+      }
+    } catch (error) {
+      console.error('Error processing single player message:', error);
+      ws.send(JSON.stringify({ error: 'Failed to process message' }));
+    }
+  });
+
+  // Send initial game state
+  sendGameState();
+
+  // Cleanup on disconnect
+  ws.on("close", () => {
+    console.log(`Single player ${player.name} disconnected from room ${room.code}`);
+    connections.delete(player.id);
+    if (connections.size === 0) {
+      roomConnections.delete(room.code);
+      rooms.delete(room.code);
+      console.log(`Single player room ${room.code} cleaned up`);
+    }
+  });
+
+  return true;
 }
