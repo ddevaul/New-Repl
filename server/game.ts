@@ -1,5 +1,8 @@
 import { generateImage, PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
 import { WebSocket } from "ws";
+import { db } from "../db/index.js";
+import { preGeneratedImages } from "../db/schema.js";
+import { eq } from "drizzle-orm";
 // Game state is managed in memory
 
 // Default word list for auto-generation
@@ -449,12 +452,22 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
       console.log('Generated new word:', room.word);
       
       try {
-        const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
-        console.log('Generating image with prompt:', prompt);
-        room.currentImage = await generateImage(prompt);
-        console.log('Successfully generated new image for word:', room.word);
+        // First try to find pre-generated images
+        const preGenerated = await db.query.preGeneratedImages.findMany({
+          where: eq(preGeneratedImages.word, room.word.toLowerCase())
+        });
+
+        if (preGenerated && preGenerated.length > 0) {
+          // Randomly select one of the pre-generated images
+          const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
+          console.log(`Found ${preGenerated.length} pre-generated images for word:`, room.word);
+          room.currentImage = randomImage.imageUrl;
+        } else {
+          console.log('No pre-generated images found for word:', room.word);
+          room.currentImage = PLACEHOLDER_IMAGE;
+        }
       } catch (error) {
-        console.error('Failed to generate image for new round:', error);
+        console.error('Failed to get pre-generated image for new round:', error);
         room.currentImage = PLACEHOLDER_IMAGE;
       }
       
