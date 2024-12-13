@@ -89,3 +89,13 @@ export const insertRoundSchema = createInsertSchema(rounds);
 export const selectRoundSchema = createSelectSchema(rounds);
 export const insertHighScoreSchema = createInsertSchema(highScores);
 export const selectHighScoreSchema = createSelectSchema(highScores);
+
+export const preGeneratedImages = pgTable("pre_generated_images", {
+  id: serial("id").primaryKey(),
+  word: text("word").notNull(),
+  imageUrl: text("image_url").notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+export const insertPreGeneratedImageSchema = createInsertSchema(preGeneratedImages);
+export const selectPreGeneratedImageSchema = createSelectSchema(preGeneratedImages);

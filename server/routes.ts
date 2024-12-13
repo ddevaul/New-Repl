@@ -10,8 +10,8 @@ import {
   getRandomWord
 } from "./game.js";
 import { db } from "../db/index.js";
-import { highScores } from "../db/schema.js";
-import { desc } from "drizzle-orm";
+import { highScores, preGeneratedImages } from "../db/schema.js";
+import { desc, eq } from "drizzle-orm";
 
 let nextRoomId = 1;
 let nextPlayerId = 1;
