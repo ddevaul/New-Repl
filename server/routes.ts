@@ -1,13 +1,14 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { signup, login, authMiddleware, checkGameLimit } from "./auth.js";
 import { isAdmin, getAllUsers, updateUserGamesLimit } from "./admin.js";
 import { 
   rooms, 
   type Room, 
   setupGameHandlers, 
-  getRandomWord
+  getRandomWord,
+  roomConnections
 } from "./game.js";
 import { db } from "../db/index.js";
 import { highScores, preGeneratedImages } from "../db/schema.js";
@@ -107,10 +108,14 @@ export function registerRoutes(app: Express): Server {
               if (connections) {
                 connections.forEach(client => {
                   if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({
+                    const state = {
                       type: 'stateUpdate',
-                      currentImage: imageData
-                    }));
+                      currentImage: imageData,
+                      waitingForGuess: true,
+                      waitingForPrompt: false
+                    };
+                    console.log('Sending updated game state to client:', { roomCode: code });
+                    client.send(JSON.stringify(state));
                   }
                 });
               }

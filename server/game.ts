@@ -45,7 +45,7 @@ export type Room = {
 };
 
 // Keep track of WebSocket connections for each room
-const roomConnections = new Map<string, Map<number, WebSocket>>();
+export const roomConnections = new Map<string, Map<number, WebSocket>>();
 
 // Store active game rooms
 export const rooms = new Map<string, Room>();
