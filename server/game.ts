@@ -461,39 +461,45 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
 
     // Function to start a new round
     async function startNewRound() {
-      console.log('Starting new round:', {
-        roomCode: room.code,
-        currentRound: room.currentRound,
-        previousWord: room.word
-      });
-
-      room.word = getRandomWord();
-      room.guesses = [];
-      room.currentRound += 1;
-      room.waitingForGuess = true;
-      room.waitingForPrompt = false;
-
-      console.log('Generated new word:', room.word);
+      let attempts = 0;
+      const maxAttempts = 5;
       
-      try {
-        // First try to find pre-generated images
-        const preGenerated = await db.query.preGeneratedImages.findMany({
-          where: eq(preGeneratedImages.word, room.word.toLowerCase())
-        });
+      // Keep trying until we find a word with pre-generated images
+      while (attempts < maxAttempts) {
+        room.word = getRandomWord();
+        console.log(`Attempt ${attempts + 1}: Checking word "${room.word}" for pre-generated images`);
+        
+        try {
+          const preGenerated = await db.query.preGeneratedImages.findMany({
+            where: eq(preGeneratedImages.word, room.word.toLowerCase())
+          });
 
-        if (preGenerated && preGenerated.length > 0) {
-          // Randomly select one of the pre-generated images
-          const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
-          console.log(`Found ${preGenerated.length} pre-generated images for word:`, room.word);
-          room.currentImage = randomImage.imageUrl;
-        } else {
-          console.log('No pre-generated images found for word:', room.word);
-          room.currentImage = PLACEHOLDER_IMAGE;
+          if (preGenerated && preGenerated.length > 0) {
+            // Found a word with pre-generated images
+            const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
+            console.log(`Found ${preGenerated.length} pre-generated images for word:`, room.word);
+            
+            // Set up the new round
+            room.guesses = [];
+            room.currentRound += 1;
+            room.waitingForGuess = true;
+            room.waitingForPrompt = false;
+            room.currentImage = randomImage.imageUrl;
+            
+            console.log('Successfully started new round with pre-generated image');
+            return; // Successfully found a word with images
+          }
+        } catch (error) {
+          console.error(`Error checking pre-generated images for word "${room.word}":`, error);
         }
-      } catch (error) {
-        console.error('Failed to get pre-generated image for new round:', error);
-        room.currentImage = PLACEHOLDER_IMAGE;
+        
+        attempts++;
       }
+      
+      // If we couldn't find a word with images after max attempts
+      console.error('Could not find a word with pre-generated images after multiple attempts');
+      room.error = 'Could not load the next round. Please try again later.';
+      room.currentImage = PLACEHOLDER_IMAGE;
       
       sendGameState();
     }
