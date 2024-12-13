@@ -45,6 +45,10 @@ export type Room = {
   waitingForGuess: boolean;
   waitingForPrompt: boolean;
   gameMode: 'single' | 'multi';
+  // Single player specific properties
+  availableImages?: string[]; // Array of image URLs for current word
+  shownImages?: Set<string>; // Set of image URLs already shown
+  error?: string; // Error message if something goes wrong
 };
 
 // Keep track of WebSocket connections for each room
@@ -436,6 +440,8 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
     player.isDrawer = false;
     room.gameMode = 'single';
     room.status = 'playing';
+    room.availableImages = []; // Track available images for current word
+    room.shownImages = new Set(); // Track which images have been shown
     
     // Initialize connections for the room if they don't exist
     if (!roomConnections.has(room.code)) {
@@ -464,40 +470,51 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
       let attempts = 0;
       const maxAttempts = 5;
       
-      // Keep trying until we find a word with pre-generated images
+      // Keep trying until we find a word with exactly 3 images
       while (attempts < maxAttempts) {
         room.word = getRandomWord();
-        console.log(`Attempt ${attempts + 1}: Checking word "${room.word}" for pre-generated images`);
+        console.log(`Attempt ${attempts + 1}: Checking word "${room.word}" for images`);
         
         try {
           const preGenerated = await db.query.preGeneratedImages.findMany({
             where: eq(preGeneratedImages.word, room.word.toLowerCase())
           });
 
-          if (preGenerated && preGenerated.length > 0) {
-            // Found a word with pre-generated images
-            const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
-            console.log(`Found ${preGenerated.length} pre-generated images for word:`, room.word);
+          if (preGenerated && preGenerated.length === 3) {
+            // Found a word with exactly 3 images
+            room.availableImages = preGenerated.map(img => img.imageUrl);
+            room.shownImages = new Set();
+            
+            // Randomly select first image to show
+            const firstImage = room.availableImages[Math.floor(Math.random() * 3)];
+            room.shownImages.add(firstImage);
             
             // Set up the new round
             room.guesses = [];
             room.currentRound += 1;
             room.waitingForGuess = true;
             room.waitingForPrompt = false;
-            room.currentImage = randomImage.imageUrl;
+            room.currentImage = firstImage;
+            room.attemptsLeft = 3;
             
-            console.log('Successfully started new round with pre-generated image');
-            return; // Successfully found a word with images
+            console.log('Successfully started new round:', {
+              word: room.word,
+              totalImages: room.availableImages.length,
+              currentImage: room.currentImage
+            });
+            return; // Successfully found a word with 3 images
+          } else if (preGenerated && preGenerated.length > 0) {
+            console.log(`Found ${preGenerated.length} images for "${room.word}", need exactly 3`);
           }
         } catch (error) {
-          console.error(`Error checking pre-generated images for word "${room.word}":`, error);
+          console.error(`Error checking images for word "${room.word}":`, error);
         }
         
         attempts++;
       }
       
-      // If we couldn't find a word with images after max attempts
-      console.error('Could not find a word with pre-generated images after multiple attempts');
+      // If we couldn't find a word with exactly 3 images
+      console.error('Could not find a word with exactly 3 images after multiple attempts');
       room.error = 'Could not load the next round. Please try again later.';
       room.currentImage = PLACEHOLDER_IMAGE;
       
@@ -624,10 +641,23 @@ function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
             }
           } else {
             // Wrong guess but has attempts left
-            ws.send(JSON.stringify({
-              type: 'wrongGuess',
-              message: `Wrong guess! You have ${3 - attemptsUsed} ${3 - attemptsUsed === 1 ? 'try' : 'tries'} left.`
-            }));
+            const remainingImages = room.availableImages?.filter(img => !room.shownImages?.has(img)) || [];
+            if (remainingImages.length > 0) {
+              // Show a new image that hasn't been shown yet
+              const nextImage = remainingImages[Math.floor(Math.random() * remainingImages.length)];
+              room.shownImages?.add(nextImage);
+              room.currentImage = nextImage;
+              
+              ws.send(JSON.stringify({
+                type: 'wrongGuess',
+                message: `Wrong guess! Here's another view. You have ${3 - attemptsUsed} ${3 - attemptsUsed === 1 ? 'try' : 'tries'} left.`
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'wrongGuess',
+                message: `Wrong guess! You have ${3 - attemptsUsed} ${3 - attemptsUsed === 1 ? 'try' : 'tries'} left.`
+              }));
+            }
           }
 
           // Send updated game state
