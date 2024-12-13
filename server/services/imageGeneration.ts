@@ -13,88 +13,119 @@ export async function generateImage(prompt: string): Promise<string> {
       return PLACEHOLDER_IMAGE;
     }
 
+    // Log the API key length to verify it's present (don't log the actual key)
+    console.log('API Key check:', {
+      keyPresent: !!apiKey,
+      keyLength: apiKey.length,
+      keyStartsWith: apiKey.substring(0, 4) + '...'
+    });
+
     // Default to stable-diffusion-xl-1024-v1-0 if not configured
     const engineId = 'stable-diffusion-xl-1024-v1-0';
-    console.log('Using Stability AI engine:', engineId);
+    const apiUrl = `https://api.stability.ai/v1/generation/${engineId}/text-to-image`;
+    
+    console.log('Using Stability AI configuration:', {
+      engine: engineId,
+      apiUrl: apiUrl
+    });
 
     const requestBody = {
       text_prompts: [{ 
-        text: `A simple, clear illustration of ${prompt}. Minimalist style, clean lines, white background.`
+        text: prompt,
+        weight: 1
       }],
       cfg_scale: 7,
       height: 1024,
       width: 1024,
       samples: 1,
+      steps: 30,
       style_preset: "digital-art"
     };
 
-    console.log('Sending request to Stability AI:', {
-      url: `https://api.stability.ai/v1/generation/${engineId}/text-to-image`,
-      apiKeyLength: apiKey.length,
-      requestBody
+    console.log('Preparing Stability AI request:', {
+      method: 'POST',
+      url: apiUrl,
+      bodyLength: JSON.stringify(requestBody).length,
+      prompt: requestBody.text_prompts[0].text
     });
 
+    // Make the API request with detailed error handling
     try {
-      const response = await fetch(
-        `https://api.stability.ai/v1/generation/${engineId}/text-to-image`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      console.log('Received response from Stability AI:', {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log('Received initial response:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries())
       });
 
+      // Read the response as text first
       const responseText = await response.text();
-      console.log('Raw API Response:', responseText);
+      console.log('Response body preview:', responseText.substring(0, 200) + '...');
 
       if (!response.ok) {
-        console.error('Stability AI API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          responseText
-        });
-        return PLACEHOLDER_IMAGE;
+        throw new Error(`API error (${response.status}): ${responseText}`);
       }
 
+      // Try to parse the response as JSON
       let responseData;
       try {
         responseData = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('Failed to parse API response:', parseError);
-        return PLACEHOLDER_IMAGE;
+        console.error('JSON Parse Error:', parseError);
+        throw new Error('Failed to parse API response as JSON');
       }
 
-      console.log('Parsed API Response:', {
-        hasArtifacts: !!responseData.artifacts,
-        artifactsLength: responseData.artifacts?.length,
-        firstArtifactHasBase64: !!responseData.artifacts?.[0]?.base64
+      // Validate the response structure
+      if (!responseData.artifacts || !Array.isArray(responseData.artifacts)) {
+        console.error('Invalid response structure:', responseData);
+        throw new Error('API response missing artifacts array');
+      }
+
+      const firstArtifact = responseData.artifacts[0];
+      if (!firstArtifact || !firstArtifact.base64) {
+        console.error('Invalid artifact structure:', firstArtifact);
+        throw new Error('API response missing base64 image data');
+      }
+
+      console.log('Successfully processed API response:', {
+        artifactsCount: responseData.artifacts.length,
+        base64Length: firstArtifact.base64.length,
+        finishReason: firstArtifact.finishReason
       });
 
-      if (!responseData.artifacts?.[0]?.base64) {
-        console.error('Invalid response format from Stability AI');
-        return PLACEHOLDER_IMAGE;
-      }
+      return `data:image/png;base64,${firstArtifact.base64}`;
 
-      const base64Image = responseData.artifacts[0].base64;
-      console.log('Successfully generated image');
-      
-      return `data:image/png;base64,${base64Image}`;
-    } catch (fetchError) {
-      console.error('Failed to fetch from Stability AI:', fetchError);
-      return PLACEHOLDER_IMAGE;
+    } catch (fetchError: any) {
+      console.error('Stability AI API Error:', {
+        name: fetchError.name,
+        message: fetchError.message,
+        cause: fetchError.cause,
+        stack: fetchError.stack
+      });
+      throw new Error(`Failed to generate image: ${fetchError.message}`);
     }
   } catch (error: any) {
-    console.error('Image generation failed:', error.message);
+    console.error('Image Generation Error:', {
+      name: error.name,
+      message: error.message,
+      cause: error.cause,
+      stack: error.stack
+    });
     return PLACEHOLDER_IMAGE;
   }
 }
