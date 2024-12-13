@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 
-export const PLACEHOLDER_IMAGE = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9IiNmNGY0ZjUiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1mYW1pbHk9InN5c3RlbS11aSwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNHB4Ij5HZW5lcmF0aW5nIGltYWdlLi4uPC90ZXh0Pjwvc3ZnPg==";
+// We'll throw an error instead of using a placeholder
+export const IMAGE_GENERATION_ERROR = "Failed to generate or retrieve image";
 
 export async function generateImage(prompt: string): Promise<string> {
   try {
@@ -9,16 +10,10 @@ export async function generateImage(prompt: string): Promise<string> {
     console.log('Starting image generation with prompt:', { prompt });
 
     if (!apiKey || apiKey.trim() === '') {
-      console.error('STABILITY_API_KEY is not set or empty');
-      return PLACEHOLDER_IMAGE;
-    }
+        throw new Error('STABILITY_API_KEY is not set or empty');
+      }
 
-    // Log the API key length to verify it's present (don't log the actual key)
-    console.log('API Key check:', {
-      keyPresent: !!apiKey,
-      keyLength: apiKey.length,
-      keyStartsWith: apiKey.substring(0, 4) + '...'
-    });
+      console.log('Verifying API key configuration...');
 
     // Default to stable-diffusion-xl-1024-v1-0 if not configured
     const engineId = 'stable-diffusion-xl-1024-v1-0';
@@ -59,14 +54,15 @@ export async function generateImage(prompt: string): Promise<string> {
       });
 
       if (!balanceResponse.ok) {
-        console.error('Invalid API key or API access error:', await balanceResponse.text());
-        return PLACEHOLDER_IMAGE;
+        const errorText = await balanceResponse.text();
+        console.error('Invalid API key or API access error:', errorText);
+        throw new Error(`API key validation failed: ${errorText}`);
       }
 
       console.log('API key validated successfully');
     } catch (balanceError: any) {
       console.error('Failed to validate API key:', balanceError);
-      return PLACEHOLDER_IMAGE;
+      throw new Error(`API key validation failed: ${balanceError.message}`);
     }
 
     // Make the API request with detailed error handling
@@ -100,7 +96,7 @@ export async function generateImage(prompt: string): Promise<string> {
 
       if (!response.ok) {
         console.error('API error response:', responseText);
-        return PLACEHOLDER_IMAGE;
+        throw new Error(`API request failed: ${responseText}`);
       }
 
       // Try to parse the response as JSON
@@ -109,19 +105,19 @@ export async function generateImage(prompt: string): Promise<string> {
         responseData = JSON.parse(responseText);
       } catch (parseError) {
         console.error('JSON Parse Error:', parseError);
-        return PLACEHOLDER_IMAGE;
+        throw new Error(`JSON parsing failed: ${parseError.message}`);
       }
 
       // Validate the response structure
       if (!responseData.artifacts || !Array.isArray(responseData.artifacts)) {
         console.error('Invalid response structure:', responseData);
-        return PLACEHOLDER_IMAGE;
+        throw new Error('Invalid response structure from Stability AI');
       }
 
       const firstArtifact = responseData.artifacts[0];
       if (!firstArtifact || !firstArtifact.base64) {
         console.error('Invalid artifact structure:', firstArtifact);
-        return PLACEHOLDER_IMAGE;
+        throw new Error('Invalid artifact structure from Stability AI');
       }
 
       console.log('Successfully processed API response:', {
@@ -139,7 +135,7 @@ export async function generateImage(prompt: string): Promise<string> {
         cause: fetchError.cause,
         stack: fetchError.stack
       });
-      return PLACEHOLDER_IMAGE;
+      throw new Error(`Stability AI API request failed: ${fetchError.message}`);
     }
   } catch (error: any) {
     console.error('Image Generation Error:', {
@@ -148,6 +144,6 @@ export async function generateImage(prompt: string): Promise<string> {
       cause: error.cause,
       stack: error.stack
     });
-    return PLACEHOLDER_IMAGE;
+    throw new Error(`Image generation failed: ${error.message}`);
   }
 }

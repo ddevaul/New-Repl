@@ -15,7 +15,6 @@ import { db } from "../db/index.js";
 import { highScores, preGeneratedImages } from "../db/schema.js";
 import { desc, eq } from "drizzle-orm";
 import { generateImage } from "./services/imageGeneration.js";
-import { PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
 
 let nextRoomId = 1;
 let nextPlayerId = 1;
@@ -58,8 +57,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  
-
   // Create room (protected route)
   app.post("/api/rooms", authMiddleware, checkGameLimit, async (req, res) => {
     const { playerName, gameMode = "multi" } = req.body;
@@ -76,7 +73,7 @@ export function registerRoutes(app: Express): Server {
       players: [{
         id: nextPlayerId++,
         name: playerName,
-        isDrawer: false, // In single player, player is always the guesser
+        isDrawer: false,
         score: 0
       }],
       word: getRandomWord(),
@@ -90,50 +87,70 @@ export function registerRoutes(app: Express): Server {
     };
 
     if (gameMode === "single") {
-        // In single player, player is always the guesser
-        room.players[0].isDrawer = false; // Force player to be guesser
-        room.status = 'playing';
-        room.currentImage = PLACEHOLDER_IMAGE; // Set placeholder initially
-        
-        // Set initial game state
-        room.waitingForPrompt = false; // AI handles image selection
-        room.waitingForGuess = true;   // Waiting for player's guess
-        room.drawerPrompts = [];       // No prompts needed in single player
-        room.attemptsLeft = 3;         // Player gets 3 attempts to guess
-
-        // Get or generate an image for the word
-        try {
-          if (!room.word) {
-            console.error('No word provided for single player game');
-            throw new Error('Word not set for single player game');
-          }
-          
-          console.log('Starting single player game for word:', room.word);
-          
-          // Try to get pre-generated image first
-          const preGenerated = await db.query.preGeneratedImages.findMany({
-            where: eq(preGeneratedImages.word, room.word.toLowerCase())
-          });
-
-          if (preGenerated && preGenerated.length > 0) {
-            // Use a pre-generated image if available
-            const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
-            console.log(`Using pre-generated image ${randomImage.id} for word:`, room.word);
-            room.currentImage = randomImage.imageUrl;
-          } else {
-            // Generate a new image if none exists
-            console.log('No pre-generated images found, generating new one for:', room.word);
-            const prompt = `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`;
-            const imageUrl = await generateImage(prompt);
-            room.currentImage = imageUrl;
-          }
-          
-          console.log('Successfully initialized single player game with image');
-        } catch (error) {
-          console.error('Single player initialization error:', error);
-          room.currentImage = PLACEHOLDER_IMAGE;
+      // In single player mode, set up initial game state
+      room.players[0].isDrawer = false;
+      room.status = 'playing';
+      room.waitingForGuess = true;
+      room.drawerPrompts = [];
+      room.attemptsLeft = 3;
+      
+      try {
+        if (!room.word) {
+          throw new Error('Word not set for single player game');
         }
+        
+        console.log('Starting single player game for word:', room.word);
+        
+        // Try to get pre-generated images
+        const preGenerated = await db.query.preGeneratedImages.findMany({
+          where: eq(preGeneratedImages.word, room.word.toLowerCase())
+        });
+
+        if (preGenerated && preGenerated.length > 0) {
+          // Use a pre-generated image if available
+          const randomImage = preGenerated[Math.floor(Math.random() * preGenerated.length)];
+          room.currentImage = randomImage.imageUrl;
+          console.log(`Using pre-generated image for word:`, room.word);
+        } else {
+          // Generate new images if none exist
+          console.log('No pre-generated images found, generating new ones for:', room.word);
+          
+          const prompts = [
+            `A simple, clear illustration of ${room.word}. Digital art style, minimalist design.`,
+            `A cartoon-style drawing of ${room.word} with bold outlines.`,
+            `A basic, easy-to-recognize ${room.word} in digital art style.`
+          ];
+          
+          // Generate and store multiple images
+          for (const prompt of prompts) {
+            try {
+              const imageUrl = await generateImage(prompt);
+              await db.insert(preGeneratedImages).values({
+                word: room.word.toLowerCase(),
+                imageUrl: imageUrl
+              });
+              
+              // Use the first successfully generated image
+              if (!room.currentImage) {
+                room.currentImage = imageUrl;
+              }
+            } catch (error) {
+              console.error('Error generating image:', error);
+              continue;
+            }
+          }
+          
+          if (!room.currentImage) {
+            throw new Error('Failed to generate any images');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize single player game:', error);
+        return res.status(500).json({ 
+          message: "Failed to start game. Please try again." 
+        });
       }
+    }
     
     rooms.set(code, room);
     console.log(`Created room ${code} with word "${room.word}"`);
@@ -172,7 +189,7 @@ export function registerRoutes(app: Express): Server {
       console.log(`Game starting in room ${code} with word "${room.word}"`);
     }
 
-    console.log(`Player ${playerName} (ID: ${newPlayer.id}) joined room ${code} as guesser`);
+    console.log(`Player ${playerName} (ID: ${newPlayer.id}) joined room ${code}`);
 
     res.json({ 
       code: room.code,
@@ -227,5 +244,3 @@ export function registerRoutes(app: Express): Server {
 
   return httpServer;
 }
-
-// Image generation is now handled by imageGeneration.ts

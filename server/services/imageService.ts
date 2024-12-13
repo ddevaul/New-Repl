@@ -1,6 +1,6 @@
 import sharp from 'sharp';
-import { uploadImage, getImageUrl } from './imageStorage.js';
-import { generateImage as generateAIImage, PLACEHOLDER_IMAGE } from './imageGeneration.js';
+import { uploadImage } from './imageStorage.js';
+import { generateImage as generateAIImage } from './imageGeneration.js';
 import { db } from "../../db/index.js";
 import { preGeneratedImages } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
@@ -27,8 +27,8 @@ export async function processAndStoreImage(word: string, imageBuffer: Buffer): P
       .png({ quality: 90, compressionLevel: 9 })
       .toBuffer();
     
-    console.log('Image processed successfully, uploading to DigitalOcean Spaces...');
-    // Upload to DigitalOcean Spaces
+    console.log('Image processed successfully, uploading to storage...');
+    // Upload to storage
     const key = `generated/${word.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}.png`;
     const storedImageUrl = await uploadImage(processedImage, key);
     console.log('Image uploaded successfully:', { key, url: storedImageUrl });
@@ -47,38 +47,57 @@ export async function processAndStoreImage(word: string, imageBuffer: Buffer): P
   }
 }
 
-// Function to generate and store images for the default word list
-export async function generateAndStoreDefaultImages(words: string[]) {
-  console.log('Starting to generate and store default images...');
+// Function to generate and store images for a word
+export async function generateAndStoreImages(word: string, count: number = 3): Promise<string[]> {
+  console.log(`Generating ${count} images for word: ${word}`);
+  const generatedUrls: string[] = [];
   
-  for (const word of words) {
+  const prompts = [
+    `A simple, clear illustration of ${word} in a minimalist style.`,
+    `A cartoon-style drawing of ${word} with bold outlines.`,
+    `A basic, easy-to-recognize ${word} in digital art style.`
+  ].slice(0, count);
+  
+  for (const prompt of prompts) {
     try {
-      // Check if we already have an image for this word
-      const existing = await db.query.preGeneratedImages.findFirst({
-        where: eq(preGeneratedImages.word, word)
-      });
+      console.log(`Generating image for prompt: ${prompt}`);
+      const imageData = await generateAIImage(prompt);
       
-      if (!existing) {
-        console.log(`Generating image for word: ${word}`);
-        const imageData = await generateAIImage(`A simple, clear illustration of ${word}`);
-        if (imageData === PLACEHOLDER_IMAGE) {
-          console.log('Received placeholder image, skipping storage');
-          continue;
-        }
-        
-        // Convert base64 to buffer
-        const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        await processAndStoreImage(word, imageBuffer);
-        console.log(`Successfully generated and stored image for: ${word}`);
-        
-        // Wait a bit between generations to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      // Convert base64 to buffer
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+      
+      // Process and store the image
+      const imageUrl = await processAndStoreImage(word, imageBuffer);
+      generatedUrls.push(imageUrl);
+      
+      // Wait between generations to avoid rate limits
+      await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (error) {
-      console.error(`Failed to generate image for word: ${word}`, error);
+      console.error(`Failed to generate image for prompt: ${prompt}`, error);
     }
   }
   
-  console.log('Finished generating and storing default images');
+  if (generatedUrls.length === 0) {
+    throw new Error(`Failed to generate any images for word: ${word}`);
+  }
+  
+  return generatedUrls;
+}
+
+// Function to get or generate images for a word
+export async function getOrGenerateImages(word: string): Promise<string[]> {
+  // Try to get existing images first
+  const existingImages = await db.query.preGeneratedImages.findMany({
+    where: eq(preGeneratedImages.word, word.toLowerCase())
+  });
+  
+  if (existingImages && existingImages.length > 0) {
+    console.log(`Found ${existingImages.length} existing images for word: ${word}`);
+    return existingImages.map(img => img.imageUrl);
+  }
+  
+  // Generate new images if none exist
+  console.log(`No existing images found for word: ${word}, generating new ones`);
+  return generateAndStoreImages(word);
 }
