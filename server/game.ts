@@ -56,41 +56,59 @@ export const rooms = new Map<string, Room>();
 
 // Function to get or generate images for a word
 async function getOrGenerateImages(word: string): Promise<string[]> {
-  // Try to get pre-generated images
-  const existingImages = await db.query.preGeneratedImages.findMany({
-    where: eq(preGeneratedImages.word, word.toLowerCase())
-  });
+  console.log('Getting or generating images for word:', word);
+  
+  try {
+    // Try to get pre-generated images first
+    const existingImages = await db.query.preGeneratedImages.findMany({
+      where: eq(preGeneratedImages.word, word.toLowerCase())
+    });
 
-  if (existingImages && existingImages.length > 0) {
-    return existingImages.map(img => img.imageUrl);
-  }
+    console.log(`Found ${existingImages.length} existing images for word:`, word);
 
-  // Generate new images
-  const prompts = [
-    `A simple, clear illustration of ${word}. Digital art style, minimalist design.`,
-    `A cartoon-style drawing of ${word} with bold outlines.`,
-    `A basic, easy-to-recognize ${word} in digital art style.`
-  ];
-
-  const generatedImages: string[] = [];
-  for (const prompt of prompts) {
-    try {
-      const imageUrl = await generateImage(prompt);
-      await db.insert(preGeneratedImages).values({
-        word: word.toLowerCase(),
-        imageUrl: imageUrl
-      });
-      generatedImages.push(imageUrl);
-    } catch (error) {
-      console.error(`Failed to generate image for prompt: ${prompt}`, error);
+    if (existingImages && existingImages.length > 0) {
+      return existingImages.map(img => img.imageUrl);
     }
-  }
 
-  if (generatedImages.length === 0) {
-    throw new Error('Failed to generate any images for the word');
-  }
+    // If no images exist, generate new ones
+    console.log('No existing images found, generating new ones for word:', word);
+    const prompts = [
+      `Create a simple, minimalistic illustration of ${word} using clean lines and basic shapes. Make it clear and easy to recognize.`,
+      `Draw ${word} in a straightforward way that a child could understand. Use clear outlines and simple details.`,
+      `Show me ${word} in its most basic, recognizable form. Focus on the essential features that make it identifiable.`
+    ];
 
-  return generatedImages;
+    const generatedImages: string[] = [];
+    for (const prompt of prompts) {
+      try {
+        console.log('Generating image with prompt:', prompt);
+        const imageUrl = await generateImage(prompt);
+        
+        // Store the generated image
+        await db.insert(preGeneratedImages).values({
+          word: word.toLowerCase(),
+          imageUrl: imageUrl
+        });
+        
+        generatedImages.push(imageUrl);
+        console.log('Successfully generated and stored image for word:', word);
+        
+        // Wait between generations to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`Failed to generate image for prompt: ${prompt}`, error);
+      }
+    }
+
+    if (generatedImages.length === 0) {
+      throw new Error(`Failed to generate any images for word: ${word}`);
+    }
+
+    return generatedImages;
+  } catch (error) {
+    console.error('Error in getOrGenerateImages:', error);
+    throw error;
+  }
 }
 
 export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) {
@@ -305,15 +323,27 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
       console.log('Starting new round with word:', room.word);
       
       // Get or generate images for the word
+      console.log('Fetching images for word:', room.word);
       const images = await getOrGenerateImages(room.word);
+      console.log(`Retrieved ${images.length} images for word:`, room.word);
+      
+      if (!images || images.length === 0) {
+        throw new Error('No images available for the word');
+      }
       
       room.availableImages = images;
-      room.currentImage = images[0]; // Use first image
+      room.currentImage = images[0]; // Start with the first image
       room.guesses = [];
       room.currentRound += 1;
       room.attemptsLeft = 3;
       room.waitingForGuess = true;
       room.waitingForPrompt = false;
+      
+      console.log('New round started successfully:', {
+        word: room.word,
+        imageCount: images.length,
+        currentRound: room.currentRound
+      });
       
       sendGameState();
     } catch (error) {
