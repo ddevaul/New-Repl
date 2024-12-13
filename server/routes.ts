@@ -76,7 +76,7 @@ export function registerRoutes(app: Express): Server {
       players: [{
         id: nextPlayerId++,
         name: playerName,
-        isDrawer: gameMode === "multi",
+        isDrawer: false, // In single player, player is always the guesser
         score: 0
       }],
       word: getRandomWord(),

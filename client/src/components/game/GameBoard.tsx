@@ -98,7 +98,8 @@ export default function GameBoard({ socket, room }: GameBoardProps) {
   // Find the current player based on the session storage ID
   const playerId = parseInt(sessionStorage.getItem('playerId') || '0', 10);
   const currentPlayer = room.players.find(player => player.id === playerId);
-  const isDrawer = currentPlayer?.isDrawer ?? false;
+  // In single player mode, player is always the guesser
+  const isDrawer = room.gameMode === 'single' ? false : (currentPlayer?.isDrawer ?? false);
 
   console.log('GameBoard - Current player:', {
     playerId,

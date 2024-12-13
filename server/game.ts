@@ -85,6 +85,10 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
         roomCode
       });
       
+      // Ensure player is always a guesser in single player mode
+      singlePlayer.isDrawer = false;
+      room.status = 'playing';
+      
       // Allow connection if it's within a reasonable window of the original ID
       // This handles cases where the client might reconnect with a slightly different ID
       if (Math.abs(singlePlayer.id - playerId) <= 2) {
