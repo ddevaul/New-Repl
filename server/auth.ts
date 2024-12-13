@@ -91,11 +91,16 @@ export async function login(req: Request, res: Response) {
     }
 
     console.log('Login successful for user:', email);
-    await logActivity({
-      userId: user.id,
-      actionType: 'login',
-      details: { email: user.email }
-    });
+    try {
+      await logActivity({
+        userId: user.id,
+        actionType: 'login',
+        details: { email: user.email }
+      });
+    } catch (error) {
+      console.warn('Failed to log login activity:', error);
+      // Continue with login process even if logging fails
+    }
 
     // Generate JWT with isAdmin flag
     const token = jwt.sign({ 

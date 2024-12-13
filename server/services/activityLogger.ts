@@ -21,7 +21,7 @@ export async function logActivity(entry: ActivityLogEntry) {
     const [log] = await db.insert(activityLogs).values({
       userId: entry.userId,
       actionType: entry.actionType,
-      details: entry.details
+      details: entry.details ? JSON.stringify(entry.details) : null
     }).returning();
     
     return log;
