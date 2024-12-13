@@ -12,6 +12,8 @@ import {
 import { db } from "../db/index.js";
 import { highScores, preGeneratedImages } from "../db/schema.js";
 import { desc, eq } from "drizzle-orm";
+import { generateImage } from "./services/imageGeneration.js";
+import { PLACEHOLDER_IMAGE } from "./services/imageGeneration.js";
 
 let nextRoomId = 1;
 let nextPlayerId = 1;
@@ -71,15 +73,20 @@ export function registerRoutes(app: Express): Server {
     };
 
     if (gameMode === "single") {
-      // Fetch a pre-generated image for single player mode
-      const preGenerated = await db.query.preGeneratedImages.findFirst({
-        where: eq(preGeneratedImages.word, room.word)
-      });
-      
-      if (preGenerated) {
-        room.currentImage = preGenerated.imageUrl;
+        room.players[0].isDrawer = true; // In single player, you're always the drawer
+        // Fetch or generate an image for single player mode
+        try {
+          console.log('Generating image for word:', room.word);
+          const imageUrl = await generateImage(`A simple illustration of ${room.word}`);
+          room.currentImage = imageUrl;
+          room.waitingForPrompt = false;
+          room.waitingForGuess = false;
+          console.log('Successfully set image for single player mode');
+        } catch (error) {
+          console.error('Failed to generate image for single player:', error);
+          room.currentImage = PLACEHOLDER_IMAGE;
+        }
       }
-    }
     
     rooms.set(code, room);
     console.log(`Created room ${code} with word "${room.word}"`);
@@ -172,4 +179,11 @@ export function registerRoutes(app: Express): Server {
   });
 
   return httpServer;
+}
+
+// Placeholder for the actual image generation function.  Replace this with your implementation.
+async function generateImage(prompt: string): Promise<string> {
+  // Replace with your actual image generation logic using an API or library.
+  // This example simulates a successful image generation.
+  return `/generated_images/${prompt.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
 }
