@@ -197,6 +197,38 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
       console.log('Received message:', message, 'from room:', roomCode);
 
       switch (message.type) {
+        case 'prompt':
+          if (!room.word) break;
+          
+          const drawer = room.players.find(p => p.isDrawer);
+          if (!drawer || drawer.id !== playerId) {
+            ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
+            break;
+          }
+
+          try {
+            console.log('Generating images for prompt:', message.prompt);
+            const images = await getOrGenerateImages(room.word);
+            
+            if (!images || images.length === 0) {
+              throw new Error('No images generated');
+            }
+            
+            room.availableImages = images;
+            room.currentImage = images[0];
+            room.waitingForGuess = true;
+            room.waitingForPrompt = false;
+            
+            console.log(`Generated ${images.length} images for word:`, room.word);
+            broadcastGameState();
+          } catch (error) {
+            console.error('Error generating images:', error);
+            ws.send(JSON.stringify({ 
+              error: 'Failed to generate images. Please try again.' 
+            }));
+          }
+          break;
+
         case 'guess':
           if (!message.guess || !room.word) break;
           
