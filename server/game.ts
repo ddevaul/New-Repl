@@ -66,7 +66,6 @@ async function getOrGenerateImages(word: string, customPrompt?: string): Promise
 
     console.log('No existing images found, generating new ones for word:', word);
 
-    // Define prompts based on whether we have a custom prompt (multiplayer) or not (singleplayer)
     const prompts = customPrompt ? [customPrompt] : [
       `Create a simple, minimalistic illustration of ${word} using clean lines and basic shapes. Make it clear and easy to recognize.`,
       `Draw ${word} in a straightforward way that a child could understand. Use clear outlines and simple details.`,
@@ -105,7 +104,11 @@ async function getOrGenerateImages(word: string, customPrompt?: string): Promise
 }
 
 export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) {
-  console.log('Setting up game handlers for room:', roomCode);
+  console.log('Setting up game handlers for room:', roomCode, {
+    url,
+    hasWebSocket: !!ws,
+    roomExists: rooms.has(roomCode)
+  });
 
   const room = rooms.get(roomCode);
   if (!room) {
@@ -116,6 +119,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
   const playerIdMatch = url.match(/playerId=(\d+)/);
   const playerId = playerIdMatch ? parseInt(playerIdMatch[1], 10) : null;
+
+  console.log('Player connection details:', {
+    playerId,
+    url,
+    playerIdMatch
+  });
 
   if (!playerId) {
     console.error('No player ID provided in WebSocket connection');
@@ -129,7 +138,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
     playerId,
     foundPlayer: !!connectingPlayer,
     gameMode: room.gameMode,
-    players: room.players.map(p => ({ id: p.id, isDrawer: p.isDrawer }))
+    players: room.players.map(p => ({ id: p.id, name: p.name, isDrawer: p.isDrawer }))
   });
 
   if (!connectingPlayer) {
@@ -157,7 +166,17 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
   const connections = roomConnections.get(roomCode)!;
   connections.set(playerId, ws);
 
-  console.log(`Player ${connectingPlayer.name} (ID: ${playerId}) connected to room ${roomCode}`);
+  console.log(`Player ${connectingPlayer.name} (ID: ${playerId}) connected to room ${roomCode}`, {
+    isDrawer: connectingPlayer.isDrawer,
+    currentWord: room.word,
+    gameState: {
+      status: room.status,
+      round: room.currentRound,
+      hasImage: !!room.currentImage,
+      waitingForPrompt: room.waitingForPrompt,
+      waitingForGuess: room.waitingForGuess
+    }
+  });
 
   function broadcastGameState() {
     if (!room) return;
@@ -166,13 +185,18 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
       roomCode,
       connectedPlayers: Array.from(connections.keys()),
       currentImage: !!room.currentImage,
-      word: room.word
+      word: room.word,
+      status: room.status,
+      round: room.currentRound
     });
 
     connections.forEach((client, pid) => {
       if (client.readyState === WebSocket.OPEN) {
         const currentPlayer = room.players.find(p => p.id === pid);
-        if (!currentPlayer) return;
+        if (!currentPlayer) {
+          console.warn(`Player ${pid} not found in room during broadcast`);
+          return;
+        }
 
         const state = {
           ...room,
@@ -187,6 +211,14 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
           waitingForGuess: !currentPlayer.isDrawer && !!room.currentImage
         };
 
+        console.log(`Sending state to player ${currentPlayer.name}:`, {
+          playerId: pid,
+          isDrawer: currentPlayer.isDrawer,
+          canSeeWord: currentPlayer.isDrawer,
+          waitingForPrompt: state.waitingForPrompt,
+          waitingForGuess: state.waitingForGuess
+        });
+
         client.send(JSON.stringify(state));
       }
     });
@@ -195,7 +227,13 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
   ws.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString());
-      console.log('Received message:', { type: message.type, roomCode, playerId });
+      console.log('Received WebSocket message:', {
+        type: message.type,
+        roomCode,
+        playerId,
+        playerName: connectingPlayer.name,
+        isDrawer: connectingPlayer.isDrawer
+      });
 
       switch (message.type) {
         case 'prompt':
@@ -205,7 +243,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             isDrawer: connectingPlayer.isDrawer,
             gameMode: room.gameMode,
             currentWord: room.word,
-            hasPrompt: !!message.prompt
+            hasPrompt: !!message.prompt,
+            roomState: {
+              currentImage: !!room.currentImage,
+              waitingForPrompt: room.waitingForPrompt,
+              availableImages: !!room.availableImages
+            }
           });
 
           if (!room.word) {
@@ -214,37 +257,51 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             break;
           }
 
-          // In multiplayer mode, verify drawer permissions
           if (room.gameMode !== 'single') {
             if (!connectingPlayer.isDrawer) {
-              console.error('Non-drawer attempted to generate image:', playerId);
+              console.error('Non-drawer attempted to generate image:', {
+                playerId,
+                playerName: connectingPlayer.name
+              });
               ws.send(JSON.stringify({ error: 'Only the drawer can generate images' }));
               break;
             }
 
-            // For multiplayer, prevent multiple prompts
-            if (room.currentImage) {
-              console.error('Images already generated for current round');
-              ws.send(JSON.stringify({ error: 'Images already generated for this round' }));
+            if (!message.prompt || typeof message.prompt !== 'string') {
+              console.error('Invalid or missing prompt:', message.prompt);
+              ws.send(JSON.stringify({ error: 'Please provide a valid prompt for image generation' }));
               break;
             }
 
-            if (!message.prompt) {
-              console.error('No prompt provided for image generation');
-              ws.send(JSON.stringify({ error: 'Please provide a prompt for image generation' }));
+            if (room.currentImage || room.availableImages) {
+              console.error('Images already generated for current round:', {
+                roomCode,
+                currentRound: room.currentRound,
+                word: room.word
+              });
+              ws.send(JSON.stringify({ error: 'Images already generated for this round' }));
               break;
             }
           }
 
           try {
-            console.log('Starting image generation for word:', room.word);
+            console.log('Starting image generation:', {
+              word: room.word,
+              gameMode: room.gameMode,
+              hasCustomPrompt: !!message.prompt
+            });
+
             const images = await getOrGenerateImages(room.word, room.gameMode === 'single' ? undefined : message.prompt);
 
             if (!images || images.length === 0) {
               throw new Error('No images generated');
             }
 
-            console.log(`Successfully generated ${images.length} images for word:`, room.word);
+            console.log('Image generation successful:', {
+              word: room.word,
+              imageCount: images.length,
+              firstImageLength: images[0].length
+            });
 
             room.drawerPrompts.push(message.prompt || '');
             room.availableImages = images;
@@ -260,13 +317,16 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               message: 'Image generated successfully'
             }));
           } catch (error) {
-            console.error('Error generating images:', error);
+            console.error('Image generation error:', {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              word: room.word,
+              gameMode: room.gameMode
+            });
             ws.send(JSON.stringify({
               error: 'Failed to generate images. Please try again.'
             }));
           }
           break;
-
         case 'guess':
           if (!message.guess || !room.word) break;
 
@@ -301,7 +361,6 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               }));
             }
           } else {
-            // Correct guess
             room.players = room.players.map(player => ({
               ...player,
               score: player.score + (player.isDrawer ? 5 : 10)
@@ -341,7 +400,6 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
           broadcastGameState();
           break;
-
         default:
           console.warn('Unhandled message type:', message.type);
       }
@@ -357,9 +415,9 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
     console.log(`Player ${connectingPlayer.name} disconnected from room ${roomCode}`);
     connections.delete(playerId);
     if (connections.size === 0) {
+      console.log(`Cleaning up empty room: ${roomCode}`);
       roomConnections.delete(roomCode);
       rooms.delete(roomCode);
-      console.log(`Room ${roomCode} cleaned up`);
     }
   });
 }
