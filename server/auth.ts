@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { logActivity } from "./services/activityLogger.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const TOKEN_EXPIRY = '7d'; // Increased from 24h to 7 days
 
 export async function signup(req: Request, res: Response) {
   try {
@@ -45,7 +46,7 @@ export async function signup(req: Request, res: Response) {
     const token = jwt.sign({ 
       id: user.id,
       isAdmin: user.isAdmin 
-    }, JWT_SECRET, { expiresIn: '24h' });
+    }, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
 
     res.json({ 
       token, 
@@ -102,11 +103,11 @@ export async function login(req: Request, res: Response) {
       // Continue with login process even if logging fails
     }
 
-    // Generate JWT with isAdmin flag
+    // Generate JWT with isAdmin flag and longer expiration
     const token = jwt.sign({ 
       id: user.id,
       isAdmin: user.isAdmin 
-    }, JWT_SECRET, { expiresIn: '24h' });
+    }, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
 
     res.json({ 
       token, 
@@ -129,18 +130,34 @@ export function authMiddleware(req: Request, res: Response, next: Function) {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
-      return res.status(401).send("Access denied. No token provided.");
+      return res.status(401).json({ 
+        message: "Access denied. No token provided.",
+        needsLogin: true
+      });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; isAdmin?: boolean };
-    req.user = {
-      id: decoded.id,
-      isAdmin: decoded.isAdmin
-    };
-    next();
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { id: number; isAdmin?: boolean };
+      req.user = {
+        id: decoded.id,
+        isAdmin: decoded.isAdmin
+      };
+      next();
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        return res.status(401).json({
+          message: "Token expired. Please log in again.",
+          needsLogin: true
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     console.error('Auth middleware error:', error);
-    res.status(401).send("Invalid token");
+    res.status(401).json({ 
+      message: "Invalid token. Please log in again.",
+      needsLogin: true
+    });
   }
 }
 
