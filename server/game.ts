@@ -48,9 +48,11 @@ export type Room = {
 export const roomConnections = new Map<string, Map<number, WebSocket>>();
 export const rooms = new Map<string, Room>();
 
-async function getOrGenerateImages(word: string): Promise<string[]> {
-  console.log('Getting or generating images for word:', word);
-  
+async function getOrGenerateImages(word: string, customPrompt?: string): Promise<string[]> {
+  console.log('Getting or generating images for word:', word, {
+    hasCustomPrompt: !!customPrompt
+  });
+
   try {
     const existingImages = await db.query.preGeneratedImages.findMany({
       where: eq(preGeneratedImages.word, word.toLowerCase())
@@ -63,27 +65,28 @@ async function getOrGenerateImages(word: string): Promise<string[]> {
     }
 
     console.log('No existing images found, generating new ones for word:', word);
-    // For multiplayer mode, use the provided prompt. For singleplayer, use predefined prompts
-    const prompts = room?.gameMode === 'single' ? [
+
+    // Define prompts based on whether we have a custom prompt (multiplayer) or not (singleplayer)
+    const prompts = customPrompt ? [customPrompt] : [
       `Create a simple, minimalistic illustration of ${word} using clean lines and basic shapes. Make it clear and easy to recognize.`,
       `Draw ${word} in a straightforward way that a child could understand. Use clear outlines and simple details.`,
       `Show me ${word} in its most basic, recognizable form. Focus on the essential features that make it identifiable.`
-    ] : [message.prompt];
+    ];
 
     const generatedImages: string[] = [];
     for (const prompt of prompts) {
       try {
         console.log('Generating image with prompt:', prompt);
         const imageUrl = await generateImage(prompt);
-        
+
         await db.insert(preGeneratedImages).values({
           word: word.toLowerCase(),
           imageUrl: imageUrl
         });
-        
+
         generatedImages.push(imageUrl);
         console.log('Successfully generated and stored image for word:', word);
-        
+
         await new Promise(resolve => setTimeout(resolve, 2000));
       } catch (error) {
         console.error(`Failed to generate image for prompt: ${prompt}`, error);
@@ -103,7 +106,7 @@ async function getOrGenerateImages(word: string): Promise<string[]> {
 
 export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) {
   console.log('Setting up game handlers for room:', roomCode);
-  
+
   const room = rooms.get(roomCode);
   if (!room) {
     console.error('Room not found:', roomCode);
@@ -136,12 +139,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
         attemptingPlayerId: playerId,
         existingPlayerId: singlePlayer.id
       });
-      
+
       if (Math.abs(singlePlayer.id - playerId) <= 2) {
         return setupSinglePlayerHandlers(ws, room, singlePlayer);
       }
     }
-    
+
     console.error('Player not found in room:', playerId);
     ws.send(JSON.stringify({ error: 'You are not a member of this room' }));
     ws.close();
@@ -158,14 +161,14 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
   function broadcastGameState() {
     if (!room) return;
-    
+
     console.log('Broadcasting game state:', {
       roomCode,
       connectedPlayers: Array.from(connections.keys()),
       currentImage: !!room.currentImage,
       word: room.word
     });
-    
+
     connections.forEach((client, pid) => {
       if (client.readyState === WebSocket.OPEN) {
         const currentPlayer = room.players.find(p => p.id === pid);
@@ -201,7 +204,8 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
             playerId,
             isDrawer: connectingPlayer.isDrawer,
             gameMode: room.gameMode,
-            currentWord: room.word
+            currentWord: room.word,
+            hasPrompt: !!message.prompt
           });
 
           if (!room.word) {
@@ -234,38 +238,38 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
           try {
             console.log('Starting image generation for word:', room.word);
-            const images = await getOrGenerateImages(room.word);
-            
+            const images = await getOrGenerateImages(room.word, room.gameMode === 'single' ? undefined : message.prompt);
+
             if (!images || images.length === 0) {
               throw new Error('No images generated');
             }
-            
+
             console.log(`Successfully generated ${images.length} images for word:`, room.word);
-            
+
             room.drawerPrompts.push(message.prompt || '');
             room.availableImages = images;
             room.currentImage = images[0];
             room.waitingForGuess = true;
             room.waitingForPrompt = false;
             room.error = undefined;
-            
+
             broadcastGameState();
-            
+
             ws.send(JSON.stringify({
               type: 'imageGenerated',
               message: 'Image generated successfully'
             }));
           } catch (error) {
             console.error('Error generating images:', error);
-            ws.send(JSON.stringify({ 
-              error: 'Failed to generate images. Please try again.' 
+            ws.send(JSON.stringify({
+              error: 'Failed to generate images. Please try again.'
             }));
           }
           break;
 
         case 'guess':
           if (!message.guess || !room.word) break;
-          
+
           const guesser = room.players.find(p => !p.isDrawer);
           if (!guesser) break;
 
@@ -289,7 +293,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               console.log(`Wrong guess. Showing image ${nextImageIndex + 1}/${room.availableImages.length}`);
             }
             room.attemptsLeft = Math.max(0, 3 - room.guesses.length);
-            
+
             if (room.attemptsLeft > 0) {
               ws.send(JSON.stringify({
                 type: 'wrongGuess',
@@ -334,7 +338,7 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
               room.waitingForPrompt = true;
             }
           }
-          
+
           broadcastGameState();
           break;
 
@@ -362,12 +366,12 @@ export function setupGameHandlers(ws: WebSocket, roomCode: string, url: string) 
 
 async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Player) {
   console.log(`Setting up single player handlers for player ${player.name} in room ${room.code}`);
-  
+
   player.isDrawer = false;
   room.gameMode = 'single';
   room.status = 'playing';
   room.attemptsLeft = 3;
-  
+
   if (!roomConnections.has(room.code)) {
     roomConnections.set(room.code, new Map());
   }
@@ -401,38 +405,38 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
     try {
       room.word = getRandomWord();
       console.log('Starting new round with word:', room.word);
-      
+
       try {
         room.guesses = [];
         room.currentImage = null;
         room.error = undefined;
         room.attemptsLeft = 3;
-        
+
         console.log('Fetching images for word:', room.word);
         const images = await getOrGenerateImages(room.word);
         console.log(`Retrieved ${images.length} images for word:`, room.word);
-        
+
         if (!images || images.length === 0) {
           throw new Error('No images available for the word');
         }
-        
+
         room.availableImages = images;
         room.currentImage = images[0];
         room.currentRound += 1;
         room.waitingForGuess = true;
         room.waitingForPrompt = false;
-        
+
         ws.send(JSON.stringify({
           type: 'roundStart',
           message: `Round ${room.currentRound} - Make your guess!`
         }));
-      
+
         console.log('New round started successfully:', {
           word: room.word,
           imageCount: images.length,
           currentRound: room.currentRound
         });
-        
+
         sendGameState();
       } catch (error) {
         console.error('Error in inner try block:', error);
@@ -448,13 +452,13 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
   ws.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString());
-      console.log('Received single player message:', { 
-        type: message.type, 
+      console.log('Received single player message:', {
+        type: message.type,
         roomCode: room.code,
         currentRound: room.currentRound,
         attemptsLeft: room.attemptsLeft
       });
-      
+
       if (message.type === 'guess') {
         room.guesses.push({
           text: message.guess,
@@ -485,20 +489,20 @@ async function setupSinglePlayerHandlers(ws: WebSocket, room: Room, player: Play
           }
         } else {
           const remainingAttempts = 3 - attemptsUsed;
-          
+
           if (remainingAttempts > 0) {
             if (room.availableImages && attemptsUsed < room.availableImages.length) {
               room.currentImage = room.availableImages[attemptsUsed];
               console.log(`Wrong guess. Showing image ${attemptsUsed + 1}/${room.availableImages.length}`);
             }
-            
+
             room.attemptsLeft = remainingAttempts;
-            
+
             ws.send(JSON.stringify({
               type: 'wrongGuess',
               message: `Wrong guess! You have ${remainingAttempts} ${remainingAttempts === 1 ? 'try' : 'tries'} left.`
             }));
-            
+
             sendGameState();
           } else {
             ws.send(JSON.stringify({
